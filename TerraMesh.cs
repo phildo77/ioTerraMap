@@ -12,9 +12,7 @@ namespace ioTerraMapGen
         {
             public int RelaxIters = 1;
             public int? Seed = null;
-            public float MinElev = -500;
-            public float MaxElev = 500;
-            public float WaterLine = 0;
+            public float MinSlope = 0.01f;
 
         }
 
@@ -28,10 +26,12 @@ namespace ioTerraMapGen
             public HashSet<int> HullIdxs;
             public Rect Bounds;
             private Random m_Rnd;
+            public readonly Settings settings;
             public TerraMesh(Rect _bounds, float _resolution, Settings _settings)
             {
+                settings = _settings;
                 Bounds = _bounds;
-                var seed = _settings.Seed ?? (int)DateTime.Now.Ticks;
+                var seed = settings.Seed ?? (int)DateTime.Now.Ticks;
                 m_Rnd = new Random(seed);
 
                 var xSize = Bounds.width;
@@ -185,11 +185,12 @@ namespace ioTerraMapGen
 
             public Vector3[] PlanchonDarboux()
             {
-                var eps = float.Epsilon * 100f;//TODO Think about this
-                
+                //Generate waterflow surface points
                 var newSurf = new Vector3[Vertices.Length];
-                var oIdxsByHt = new int[Vertices.Length];
+                //var oIdxsByHt = new int[Vertices.Length];
 
+                
+                
                 for (int pIdx = 0; pIdx < Vertices.Length; ++pIdx)
                 {
                     var oVert = Vertices[pIdx];
@@ -197,37 +198,106 @@ namespace ioTerraMapGen
                     if (HullIdxs.Contains(pIdx))
                         z = oVert.z;
                     newSurf[pIdx] = new Vector3(oVert.x, oVert.y, z);
-                    oIdxsByHt[pIdx] = pIdx;
+                    //oIdxsByHt[pIdx] = pIdx;
                 }
                 
-                //Order vert Idxs by z
-                Array.Sort(oIdxsByHt, (_a, _b) => (Vertices[_b].z).CompareTo(Vertices[_a].z));
-
-                for (int iIdx = 0; iIdx < oIdxsByHt.Length; ++iIdx)
+                Func<int, float> Z = _idx => Vertices[_idx].z;
+                Func<int, float> W = _idx => newSurf[_idx].z;
+                Func<int, int, float> E = (_cIdx, _nIdx) =>
                 {
-                    var oIdx = oIdxsByHt[iIdx];
-                    var actVert = Vertices[oIdx];
-                    if (HullIdxs.Contains(oIdx)) continue;
-                    var nIdxs = Neighbors[oIdx];
-                    float minNZ = nIdxs.Select(_nIdx => Vertices[_nIdx].z).Min();
-                    /*
-                    float minNZ = float.PositiveInfinity;
-                    foreach (var nIdx in nIdxs)
+                    var cVert = Vertices[_cIdx];
+                    var nVert = Vertices[_cIdx];
+                    var subX = nVert.x - cVert.x;
+                    var subY = nVert.y - cVert.y;
+                    return (float) Math.Sqrt(subX * subX + subY * subY) * settings.MinSlope;
+                };
+                
+                var opDone = false;
+                do
+                {
+                    opDone = false;
+                    for (int pIdx = 0; pIdx < Vertices.Length; ++pIdx)
                     {
-                        var nbr = Vertices[nIdx];
-                        if (nbr.z < minNZ)
+                        if (HullIdxs.Contains(pIdx)) continue;
+                        var c = pIdx;
+                        if (!(W(c) > Z(c))) continue;
+                        var cVertZ = Vertices[c];
+                        foreach (var n in Neighbors[c])
                         {
-                            minNZ = nbr.z;
+                            var e = E(c, n);
+                            var wpn = W(n) + e;
+                            if (Z(c) >= wpn)
+                            {
+                                newSurf[c].Set(cVertZ.x, cVertZ.y, cVertZ.z);
+                                opDone = true;
+                                break;
+                            }
+                            if(W(c) > wpn)
+                            {
+                                newSurf[c].Set(cVertZ.x, cVertZ.y, wpn);
+                                opDone = true;
+                            }
                         }
                     }
-                    */
-                    if (minNZ < actVert.z)
-                        newSurf[oIdx] = new Vector3(actVert.x, actVert.y, actVert.z);
-                    else
-                        newSurf[oIdx] = new Vector3(actVert.x, actVert.y, minNZ + eps);
-                }
+
+                } while (opDone);
+                    
 
                 return newSurf;
+
+            }
+            
+
+            public float[] CalcWaterFlux(Vector3[] _waterSurface, float _rainfall, out List<Vector3> _waterways)
+            {
+                var pIdxByHt = new int[Vertices.Length];
+                for (var pIdx = 0; pIdx < Vertices.Length; ++pIdx)
+                    pIdxByHt[pIdx] = pIdx;
+                Array.Sort(pIdxByHt, (_a, _b) => _waterSurface[_b].z.CompareTo(_waterSurface[_a].z));
+                
+                
+                var debugHts = pIdxByHt.Select(_idx => _waterSurface[_idx].z).ToArray();
+                _waterways = new List<Vector3>();
+                
+                var flux = new float[Vertices.Length];
+                for (int hIdx = 0; hIdx < Vertices.Length; ++hIdx)
+                {
+                    var pIdx = pIdxByHt[hIdx];
+                    var w = _waterSurface[pIdx];
+                    flux[pIdx] += _rainfall;
+                    //if (p.z < wZ) //TODO DEBUG should never happen?
+                    //   continue;
+
+                    
+                    //Find downhill
+                    var minNIdx = -1;
+                    var maxNSlp = 0f;
+                    foreach (var nIdx in Neighbors[pIdx])
+                    {
+                        var n = _waterSurface[nIdx];
+                        
+                        if (n.z < w.z)
+                        {
+                            var vec = n - w;
+                            var run = (float) Math.Sqrt(vec.x * vec.x + vec.y + vec.y);
+                            var rise = w.z - n.z;
+                            var slp = rise / run;
+                            if (slp > maxNSlp)
+                            {
+                                minNIdx = nIdx;
+                                maxNSlp = slp;
+                            }
+                        }
+                    }
+
+                    if (minNIdx == -1) //TODO DEBUG should never happen?
+                        continue;
+                    _waterways.Add(w);
+                    _waterways.Add(_waterSurface[minNIdx] - w);
+                    flux[minNIdx] += flux[pIdx];
+                }
+
+                return flux;
             }
 
             public float GetZSpan()
