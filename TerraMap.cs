@@ -29,7 +29,22 @@ namespace ioTerraMapGen
             var seed = settings.Seed ?? (int)DateTime.Now.Ticks;
             m_Rnd = new Random(seed);
             TMesh = new TerraMesh(this);
+            
+            //Land morphing
+            TMesh.Conify(settings.ConifyStrength);
+            var gSlpDir = settings.GlobalSlopeDir == Vector2.zero
+                ? new Vector2((float) (m_Rnd.NextDouble() - 0.5f), (float) (m_Rnd.NextDouble() - 0.5f))
+                : settings.GlobalSlopeDir;
+            TMesh.SlopeGlobal(settings.GlobalSlopeDir, settings.GlobalSlopeMag);
+            for (int hIdx = 0; hIdx < settings.HillRndCnt.Count; ++hIdx)
+            {
+                for (int hCnt = 0; hCnt < settings.HillRndCnt[hCnt]; ++hCnt)
+                    TMesh.Blob(settings.HillRndStr[hIdx], settings.HillRndRad[hIdx]);
+            }
 
+            //Erosion
+            
+            
             return null; //TODO
         }
         

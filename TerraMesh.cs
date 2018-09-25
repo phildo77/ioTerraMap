@@ -183,15 +183,14 @@ namespace ioTerraMapGen
                 }
             }
             
-            public void Conify(bool _inverted, float _strength)
+            public void Conify(float _strength)
             {
                 var cent = Bounds.center;
                 var maxMag = (Bounds.min - cent).magnitude;
-                var dir = _inverted ? -1f : 1f;
                 Func<Vector2, float> zAdder = _pos =>
                 {
-                    var magScal = (_pos - cent).magnitude / maxMag  - 0.5f;
-                    return magScal * _strength / 2f * dir;
+                    var magScal = (_pos - cent).magnitude / maxMag - 0.5f;
+                    return magScal * _strength / 2f;
                 };
                 
                 for (int sIdx = 0; sIdx < SitePos.Length; ++sIdx)
@@ -221,7 +220,7 @@ namespace ioTerraMapGen
                 }
             }
             
-            public Vector3[] PlanchonDarboux()
+            private Vector3[] PlanchonDarboux()
             {
                 //Generate waterflow surface points
                 var newSurf = new Vector3[SitePos.Length];
@@ -283,27 +282,25 @@ namespace ioTerraMapGen
     
             public void Erode()
             {
-                /*
-                var pd = PlanchonDarboux();
                 
-                ioTerraMapGen.Vector3[] flowDir;
+                var pd = PlanchonDarboux();
+                Vector3[] flowDir;
+                
                 float[] slopes;
-                var flux = CalcWaterFlux(pd, tgt.Rainfall, out flowDir);
-                var slopeVecs = tm.GetSlopeVecs(tm.SitePos, out slopes);
-                for (int pIdx = 0; pIdx < tm.SitePos.Length; ++pIdx)
+                var flux = CalcWaterFlux(pd, Host.settings.RainfallGlobal, out flowDir);
+                var slopeVecs = GetSlopeVecs(SitePos, out slopes);
+                for (int pIdx = 0; pIdx < SitePos.Length; ++pIdx)
                 {
-                    var vert = tm.SitePos[pIdx];
-                    var fx = Mathf.Sqrt(flux[pIdx]);
+                    var vert = SitePos[pIdx];
+                    var fx = (float)Math.Sqrt(flux[pIdx]);
                     var slp = slopes[pIdx];
-                    var ero = Mathf.Min(-slp * fx, tgt.MaxEroRate);
+                    var ero = (float)Math.Min(-slp * fx, settings.MaxErosionRate);
                     var newZ = vert.z - ero;
                     
-                    tm.SitePos[pIdx].Set(vert.x, vert.y, newZ);
+                    SitePos[pIdx].Set(vert.x, vert.y, newZ);
                 }
                 
-                
-                LRTerra();
-    
+                /*
                 tgt.Waterways = flowDir.Select(_v => new Vector3(_v.x, _v.y, _v.z)).ToArray();
     
                 var minFlux = float.PositiveInfinity;
@@ -317,6 +314,20 @@ namespace ioTerraMapGen
                         maxFlux = f;
                 }
                 */
+                
+            }
+
+            public class Waterway
+            {
+                public WaterwayNode LastNode;
+                public class WaterwayNode
+                {
+                    public int SiteIdx;
+                    public WaterwayNode NodeFrom;
+                    public WaterwayNode NodeTo;
+                    public float Flux;
+                }
+
             }
             
             public float[] CalcWaterFlux(Vector3[] _waterSurface, float _rainfall, out Vector3[] _flowDir)
