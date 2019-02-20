@@ -17,14 +17,15 @@ namespace ioTerraMapGen
             public const int SITE_IDX_NULL = -1;
             public TerraMap Host;
             public Settings settings => Host.settings;
-            public Rect Bounds => settings.Bounds;
             private Random m_Rnd => Host.m_Rnd;
             public Vector3[] SitePos;
+            public Vector3[] PlanchDarb;
             public Vector2[] CornerPos;
             public int[][] SiteNbrs;
             public int[][] SiteCrns;
             public HashSet<int>[] SitesHavingCorner;
             public readonly int[] Triangles;
+
     
             public int[] TrianglesCCW
             {
@@ -74,9 +75,10 @@ namespace ioTerraMapGen
             public TerraMesh(TerraMap _hostMap)
             {
                 Host = _hostMap;
-    
-                var xSize = Bounds.width;
-                var ySize = Bounds.height;
+
+                var bnds = Host.settings.Bounds;
+                var xSize = bnds.width;
+                var ySize = bnds.height;
                 var xSpanCount = xSize * settings.Resolution;
                 var ySpanCount = ySize * settings.Resolution;
                 int pntCnt = (int)(xSpanCount * ySpanCount);
@@ -86,14 +88,14 @@ namespace ioTerraMapGen
                 var points = new List<Vector2>(pntCnt);
     
                 for (int pIdx = 0; pIdx < pntCnt; ++pIdx)
-                    points.Add(RndVec2(Bounds));
+                    points.Add(RndVec2(bnds));
                 
                 var del = Delaunay.Create<CircleSweep>(points);
                 del.Triangulate();
                 var vor = new Voronoi(del);
                 vor.Build();
-                vor.TrimSitesToBndry(Bounds);
-                vor.LloydRelax(Bounds);
+                vor.TrimSitesToBndry(bnds);
+                vor.LloydRelax(bnds);
     
                 var dMesh = del.Mesh;
     
@@ -163,10 +165,11 @@ namespace ioTerraMapGen
             public void SlopeGlobal(Vector2 _dir, float _strength)
             {
                 var dir = _dir.normalized;
+                var bnds = Host.settings.Bounds;
                 Func<Vector3, float> strf = _pos =>
                 {
-                    var xPct = (_pos.x - Bounds.xMin) / (Bounds.width) - 0.5f;
-                    var yPct = (_pos.y - Bounds.yMin) / Bounds.height - 0.5f;
+                    var xPct = (_pos.x - bnds.xMin) / (bnds.width) - 0.5f;
+                    var yPct = (_pos.y - bnds.yMin) / bnds.height - 0.5f;
                     var xStr = xPct * dir.x;
                     var yStr = yPct * dir.y;
                     return (xStr + yStr) * _strength / 4f;
@@ -185,8 +188,8 @@ namespace ioTerraMapGen
             
             public void Conify(float _strength)
             {
-                var cent = Bounds.center;
-                var maxMag = (Bounds.min - cent).magnitude;
+                var cent = Host.settings.Bounds.center;
+                var maxMag = (Host.settings.Bounds.min - cent).magnitude;
                 Func<Vector2, float> zAdder = _pos =>
                 {
                     var magScal = (_pos - cent).magnitude / maxMag - 0.5f;
@@ -204,7 +207,7 @@ namespace ioTerraMapGen
             public void Blob(float _strength, float _radius, Vector2? _loc = null)
             {
                 if (_loc == null)
-                    _loc = RndVec2(Bounds);
+                    _loc = RndVec2(Host.settings.Bounds);
     
                 var loc = _loc.Value;
                 
@@ -244,9 +247,12 @@ namespace ioTerraMapGen
                     return (float) Math.Sqrt(subX * subX + subY * subY) * settings.MinPDSlope;
                 };
                 
+                
                 var opDone = false;
+                var wCnt = 0; //DEBUG
                 do
                 {
+                    
                     opDone = false;
                     for (int pIdx = 0; pIdx < SitePos.Length; ++pIdx)
                     {
@@ -272,10 +278,10 @@ namespace ioTerraMapGen
                             }
                         }
                     }
-    
+
+                    if (++wCnt > 2) break;
                 } while (opDone);
                     
-    
                 return newSurf;
     
             }
@@ -283,16 +289,14 @@ namespace ioTerraMapGen
             public void Erode()
             {
                 
-                var pd = PlanchonDarboux();
-                Vector3[] flowDir;
-                
                 float[] slopes;
-                var flux = CalcWaterFlux(pd, Host.settings.RainfallGlobal, out flowDir);
+                PlanchDarb = PlanchonDarboux();
+                CalcWaterFlux(PlanchDarb);
                 var slopeVecs = GetSlopeVecs(SitePos, out slopes);
                 for (int pIdx = 0; pIdx < SitePos.Length; ++pIdx)
                 {
                     var vert = SitePos[pIdx];
-                    var fx = (float)Math.Sqrt(flux[pIdx]);
+                    var fx = (float)Math.Sqrt(Host.Waterways[pIdx].Flux);
                     var slp = slopes[pIdx];
                     var ero = (float)Math.Min(-slp * fx, settings.MaxErosionRate);
                     var newZ = vert.z - ero;
@@ -300,34 +304,120 @@ namespace ioTerraMapGen
                     SitePos[pIdx].Set(vert.x, vert.y, newZ);
                 }
                 
-                /*
-                tgt.Waterways = flowDir.Select(_v => new Vector3(_v.x, _v.y, _v.z)).ToArray();
-    
-                var minFlux = float.PositiveInfinity;
-                var maxFlux = float.NegativeInfinity;
-                for (int fIdx = 0; fIdx < flux.Length; ++fIdx)
-                {
-                    var f = flux[fIdx];
-                    if (f < minFlux)
-                        minFlux = f;
-                    if (f > maxFlux)
-                        maxFlux = f;
-                }
-                */
                 
             }
 
-            public class Waterway
+            public float CalcWaterLevel()
             {
-                public WaterwayNode LastNode;
-                public class WaterwayNode
+                var landPctTgt = settings.LandWaterRatio;
+                if (landPctTgt <= 0 || landPctTgt >= 1)
+                    landPctTgt = 0.5f;
+
+                var zMin = float.PositiveInfinity;
+                var zMax = float.NegativeInfinity;
+                
+                //Find min max z TODO save from previous operation?
+                foreach (var site in SitePos)
                 {
-                    public int SiteIdx;
-                    public WaterwayNode NodeFrom;
-                    public WaterwayNode NodeTo;
-                    public float Flux;
+                    if (site.z < zMin)
+                        zMin = site.z;
+                    if (site.z > zMax)
+                        zMax = site.z;
+                }
+                
+                //Start Find
+                var zCheck = zMin + ((zMax - zMin) / 2f);
+                var zRailMax = zMax;
+                var zRailMin = zMin;
+                while (true) //TODO this is brute force
+                {
+                    
+                    var aboveCnt = 0;
+                    var belowCnt = 0;
+                    foreach (var site in SitePos)
+                    {
+                        if (site.z > zCheck)
+                            aboveCnt++;
+                        else
+                            belowCnt++;
+                    }
+
+                    var pctLandCheck = (float)aboveCnt / (float)(aboveCnt + belowCnt);
+                    var errorPct = 0.05;
+                    if (pctLandCheck > landPctTgt + errorPct)
+                    {
+                        zRailMin = zCheck;
+                        zCheck += (zRailMax - zCheck) / 2f;
+                        continue;
+                    }
+                    else if (pctLandCheck < landPctTgt - errorPct)
+                    {
+                        zRailMax = zCheck;
+                        zCheck -= (zCheck - zRailMin) / 2f;
+                        continue;
+                    }
+
+                    break;
                 }
 
+                return zCheck;
+            }
+
+            private void CalcWaterFlux(Vector3[] _waterSurface)
+            {
+                Host.Waterways = new WaterNode[SitePos.Length];
+                
+                
+                
+                
+                //TODO not needed
+                var pIdxByHt = new int[SitePos.Length];
+                for (var pIdx = 0; pIdx < SitePos.Length; ++pIdx)
+                {
+                    pIdxByHt[pIdx] = pIdx;
+                    Host.Waterways[pIdx] = new WaterNode
+                    {
+                        Flux = settings.RainfallGlobal,
+                        SiteIdx = pIdx
+                    };
+                }
+                    
+                Array.Sort(pIdxByHt, (_a, _b) => _waterSurface[_b].z.CompareTo(_waterSurface[_a].z));
+                
+                for (int hIdx = 0; hIdx < SitePos.Length; ++hIdx)
+                {
+                    var pIdx = pIdxByHt[hIdx];
+                    var w = _waterSurface[pIdx];
+                    
+                    //Find downhill
+                    var minNIdx = -1;
+                    var maxNSlp = 0f;
+                    foreach (var nIdx in SiteNbrs[pIdx])
+                    {
+                        if (nIdx == SITE_IDX_NULL) continue;
+                        var n = _waterSurface[nIdx];
+                        
+                        if (n.z <= w.z)
+                        {
+                            var vec = n - w;
+                            var run = (float) Math.Sqrt(vec.x * vec.x + vec.y * vec.y);
+                            var rise = w.z - n.z;
+                            var slp = rise / run;
+                            if (slp > maxNSlp)
+                            {
+                                minNIdx = nIdx;
+                                maxNSlp = slp;
+                            }
+                        }
+                    }
+    
+                    if (minNIdx == -1) //TODO DEBUG should never happen?
+                        continue;
+                    if (minNIdx == pIdx)  //TODO DEBUG
+                        continue;
+                    Host.Waterways[minNIdx].Flux += Host.Waterways[pIdx].Flux;
+                    Host.Waterways[pIdx].NodeTo = Host.Waterways[minNIdx];
+                }
             }
             
             public float[] CalcWaterFlux(Vector3[] _waterSurface, float _rainfall, out Vector3[] _flowDir)
@@ -423,8 +513,19 @@ namespace ioTerraMapGen
     
             public void SetHeightSpan(float _min, float _max)
             {
-                float minZ, maxZ;
-                var zSpan = GetZSpan(out minZ, out maxZ);
+                float minZ = float.PositiveInfinity, 
+                    maxZ = float.NegativeInfinity;
+                
+                for (int sIdx = 0; sIdx < SitePos.Length; ++sIdx)
+                {
+                    var z = SitePos[sIdx].z;
+                    if (z < minZ) 
+                        minZ = z;
+                    if (z > maxZ)
+                        maxZ = z;
+                }
+                
+                var zSpan = maxZ - minZ;
     
                 var newSpan = _max - _min;
     
@@ -436,6 +537,7 @@ namespace ioTerraMapGen
                     SitePos[sIdx].Set(sPos.x, sPos.y, (zPct * newSpan) + _min);
                 }
             }
+            
             
             public float GetZSpan()
             {
@@ -458,6 +560,7 @@ namespace ioTerraMapGen
                 return _zMax - _zMin;
     
             }
+            
             
             private Vector2 ToVec2(Vector3 _vec)
             {

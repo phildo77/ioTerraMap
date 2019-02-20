@@ -9,18 +9,17 @@ namespace ioTerraMapGen
             public Biome[][] BiomeConfig;
             public Biome BiomeWater;
             public int[] SiteBiomeMoistZone;
-            public TerraMesh HostMesh;
-            public float WaterLevelNorm = 0.5f;
+            public TerraMap Host;
     
     
-            public BiomeStuff(TerraMesh _tMesh)
+            public BiomeStuff(TerraMap _host)
             {
-                HostMesh = _tMesh;
+                Host = _host;
                 //Set up Biomes
                 SetupBiomes();
                 
                 //TODO Config Biomes on map using units of distance
-                var sitePos = HostMesh.SitePos;
+                var sitePos = Host.TMesh.SitePos;
                 SiteBiomeMoistZone = new int[sitePos.Length];
                 //SiteBiomeElevZone = new int[sitePos.Length];
                 //SiteBiomes = new Biome[sitePos.Length];

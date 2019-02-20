@@ -35,8 +35,8 @@ using ioDelaunay;
             public List<float> HillRndRad = new List<float> {80, 200};
             
 
-            //Terrain massaging
-            
+            //Painting / Texture
+            public int TextureResolution = 10; //Pixels per km
             
             public static Settings Default = new Settings();
             //NOTES

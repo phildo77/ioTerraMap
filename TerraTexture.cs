@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using ioDelaunay;
 
@@ -12,8 +14,9 @@ namespace ioTerraMapGen
             public readonly int Height;
             public readonly int Width;
             public Color[] Pixels;
-            public BiomeStuff HostMap;
-            public Vector2 GridStep;
+            public TerraMap Host;
+            private Vector2 m_PixStep;
+            private Vector2 m_PixSize;
             
         
             public struct Color
@@ -21,36 +24,44 @@ namespace ioTerraMapGen
                 public float r;
                 public float g;
                 public float b;
+                public float a;
     
-                public Color(float _r, float _g, float _b)
+                public Color(float _r, float _g, float _b, float _a = 1f)
                 {
                     r = _r;
                     g = _g;
                     b = _b;
+                    a = _a;
                 }
-                
-                public Color(short _r, short _g, short _b)
+
+                public Color(byte _r, byte _g, byte _b, byte _a = 255)
                 {
                     r = _r / 255f;
                     g = _g / 255f;
                     b = _b / 255f;
+                    a = _a / 255f;
                 }
             }
             
-            public TerraTexture(BiomeStuff _hostMap, int _width, int _height)
+            public TerraTexture(TerraMap _host)
             {
-                HostMap = _hostMap;
-                var hostMesh = _hostMap.HostMesh;
-                Width = _width;
-                Height = _height;
-                var eVerts = hostMesh.ElevatedVerts();
-                var hBnds = hostMesh.Bounds;
-                var xStep = hBnds.height / _height;
-                var yStep = hBnds.width / _width;
-                GridStep = new Vector2(xStep, yStep);
-                Pixels = new Color[_width * _height];
-    
-                var tris = hostMesh.Triangles;
+                Host = _host;
+                var mesh = Host.TMesh;
+                var bnds = Host.settings.Bounds;
+                
+                Width = (int) (Host.settings.TextureResolution * bnds.width);
+                Height = (int) (Host.settings.TextureResolution * bnds.height);
+                var eVerts = mesh.ElevatedVerts();
+                var xStep = bnds.width / Width;
+                var yStep = bnds.height / Height;
+                m_PixStep = new Vector2(xStep, yStep);
+                m_PixSize = new Vector2(bnds.width / Width, bnds.height / Height);
+                Pixels = new Color[Width * Height];
+                Pixels = Enumerable.Repeat(new Color(0, 0, 0, 0), Width * Height).ToArray();
+
+                float zMin, zMax;
+                var zSpan = _host.TMesh.GetZSpan(out zMin, out zMax);
+                var tris = mesh.Triangles;
     
                 for (int tvIdx = 0; tvIdx < tris.Length; tvIdx += 3)
                 {
@@ -59,34 +70,174 @@ namespace ioTerraMapGen
                     //var elvZne = HostMap.SiteBiomeElevZone[sIdx];
                     //var biome = HostMap.BiomeConfig[elvZne,mstZne];
                     var verts = new[] {eVerts[tris[tvIdx]], eVerts[tris[tvIdx + 1]], eVerts[tris[tvIdx + 2]]};
-                    PaintTriangle(sIdx, verts);
+
+                    PaintTriangle(sIdx, verts, zMin, zSpan, _host.WaterSurfaceZ);
                 }
                 
+                //Paint Waterways
+                PaintWaterways();
+
             }
     
             private void PaintWaterways()
             {
-               
+                var wws = Host.Waterways;
+
+                float fMin = float.PositiveInfinity;
+                float fMax = float.NegativeInfinity;
+                foreach (var ww in wws)
+                {
+                    if (ww.Flux < fMin)
+                        fMin = ww.Flux;
+                    if (ww.Flux > fMax)
+                        fMax = ww.Flux;
+                }
+
+                float fSpan = fMax - fMin;
+
+                foreach (var ww in wws)
+                {
+                    if (ww.NodeTo == null) continue;
+                    if (ww.Flux < (fMin + fSpan / 16f)) // TODO in Settings?
+                        continue;
+                    var a = Host.TMesh.SitePos[ww.SiteIdx].ToVec2();
+                    var b = Host.TMesh.SitePos[ww.NodeTo.SiteIdx].ToVec2();
+                    var brush = new Brush(Brush.Shape.Circle, 1, new Color(0f,0f,1f)); //TODO Dynamic sizing
+                    PaintLineWld(a, b, brush);
+                }
+            }
+
+            private int[] GetPixelAtWld(Vector2 _pos)
+            {
+                return new [] {(int)(_pos.x / m_PixStep.x), (int)(_pos.y / m_PixStep.y)};
+            }
+            
+            private void DrawLine(Vector2 _a, Vector2 _b, Color _col)
+            {
+                var aCrd = GetPixelAtWld(_a);
+                var bCrd = GetPixelAtWld(_b);
+
+                DrawLine(aCrd[0], aCrd[1], bCrd[0], bCrd[1], _col);
+            }
+
+            private void Paint(Brush _brush, int _x, int _y)
+            {
+                foreach (var coord in _brush.Footprint)
+                {
+                    var x = _x + (int)coord.x;
+                    var y = _y + (int)coord.y;
+                    if (x < 0 || x >= Width) continue;
+                    if (y < 0 || y >= Height) continue;
+                    SetColorAtPix(x, y, _brush.Color);
+                }
+            }
+
+            private void PaintLineWld(Vector2 _from, Vector2 _to, Brush _brush)
+            {
+                var aCrd = GetPixelAtWld(_from);
+                var bCrd = GetPixelAtWld(_to);
+
+                PaintLinePix(aCrd[0], aCrd[1], bCrd[0], bCrd[1], _brush);
+            }
+            
+            private void PaintLinePix(int x,int y,int x2, int y2, Brush _brush) {
+                int w = x2 - x ;
+                int h = y2 - y ;
+                int dx1 = 0, dy1 = 0, dx2 = 0, dy2 = 0 ;
+                if (w<0) dx1 = -1 ; else if (w>0) dx1 = 1 ;
+                if (h<0) dy1 = -1 ; else if (h>0) dy1 = 1 ;
+                if (w<0) dx2 = -1 ; else if (w>0) dx2 = 1 ;
+                int longest = Math.Abs(w) ;
+                int shortest = Math.Abs(h) ;
+                if (!(longest>shortest)) {
+                    longest = Math.Abs(h) ;
+                    shortest = Math.Abs(w) ;
+                    if (h<0) dy2 = -1 ; else if (h>0) dy2 = 1 ;
+                    dx2 = 0 ;            
+                }
+                int numerator = longest >> 1 ;
+                for (int i=0;i<=longest;i++) {
+                    Paint(_brush, x, y);
+                    numerator += shortest ;
+                    if (!(numerator<longest)) {
+                        numerator -= longest ;
+                        x += dx1 ;
+                        y += dy1 ;
+                    } else {
+                        x += dx2 ;
+                        y += dy2 ;
+                    }
+                }
+            }
+            
+            private void DrawLine(int x,int y,int x2, int y2, Color color) {
+                int w = x2 - x ;
+                int h = y2 - y ;
+                int dx1 = 0, dy1 = 0, dx2 = 0, dy2 = 0 ;
+                if (w<0) dx1 = -1 ; else if (w>0) dx1 = 1 ;
+                if (h<0) dy1 = -1 ; else if (h>0) dy1 = 1 ;
+                if (w<0) dx2 = -1 ; else if (w>0) dx2 = 1 ;
+                int longest = Math.Abs(w) ;
+                int shortest = Math.Abs(h) ;
+                if (!(longest>shortest)) {
+                    longest = Math.Abs(h) ;
+                    shortest = Math.Abs(w) ;
+                    if (h<0) dy2 = -1 ; else if (h>0) dy2 = 1 ;
+                    dx2 = 0 ;            
+                }
+                int numerator = longest >> 1 ;
+                for (int i=0;i<=longest;i++) {
+                    SetColorAtPix(x,y,color) ;
+                    numerator += shortest ;
+                    if (!(numerator<longest)) {
+                        numerator -= longest ;
+                        x += dx1 ;
+                        y += dy1 ;
+                    } else {
+                        x += dx2 ;
+                        y += dy2 ;
+                    }
+                }
+            }
+
+            private void SetColorAtWld(Vector2 _pos, Color _col)
+            {
+                var crd = GetPixelAtWld(_pos);
+                var x = crd[0];
+                var y = crd[1];
+
+                if(y * Width + x >= Pixels.Length) //TODO DEBUG
+                    Trace.WriteLine("Debug");
+                Pixels[y * Width + x] = _col;
+            }
+            
+            private void SetColorAtPix(int _x, int _y, Color _col)
+            {
+                Pixels[_y * Width + _x] = _col;
             }
     
-            private void PaintTriangle(int _sIdx, Vector3[] _triVerts)
+            //TODO Messy (zspan & unefficient)
+            private void PaintTriangle(int _sIdx, Vector3[] _triVerts, float zMin, float zSpan, float _zWaterLvl)
             {
+                var wldOffset = new Vector3(Host.settings.Bounds.min.x, Host.settings.Bounds.min.y, 0);
+
+                var triVertsOS = _triVerts.Select(_tri => _tri - wldOffset).ToArray();
                 
-                var xMin = _triVerts.Min(_tri => _tri.x);
-                var xMax = _triVerts.Max(_tri => _tri.x);
-                var yMin = _triVerts.Min(_tri => _tri.y);
-                var yMax = _triVerts.Max(_tri => _tri.y);
+                var xMin = triVertsOS.Min(_tri => _tri.x);
+                var xMax = triVertsOS.Max(_tri => _tri.x);
+                var yMin = triVertsOS.Min(_tri => _tri.y);
+                var yMax = triVertsOS.Max(_tri => _tri.y);
     
                 //Get starting surface sampling position
-                var xCntMin = ((int) (xMin / GridStep.x));
-                var yCntMin = ((int) (yMin / GridStep.y));
-                var xCntMax = ((int) (xMax / GridStep.x));
-                var yCntMax = ((int) (yMax / GridStep.y));
+                var xCntMin = ((int) (xMin / m_PixStep.x));
+                var yCntMin = ((int) (yMin / m_PixStep.y));
+                var xCntMax = ((int) (xMax / m_PixStep.x));
+                var yCntMax = ((int) (yMax / m_PixStep.y));
                 
                 //Create Z calc function
-                var p1 = _triVerts[0];
-                var p2 = _triVerts[1];
-                var p3 = _triVerts[2];
+                var p1 = triVertsOS[0];
+                var p2 = triVertsOS[1];
+                var p3 = triVertsOS[2];
     
                 var v1x = p1.x - p3.x;
                 var v1y = p1.y - p3.y;
@@ -103,9 +254,8 @@ namespace ioTerraMapGen
     
                 var d = abcx * p3.x + abcy * p3.y + abcz * p3.z;
                 
-                float zMin, zMax;
-                var zSpan = HostMap.HostMesh.GetZSpan(out zMin, out zMax); //TODO inefficient
-                var wLvl = zSpan * HostMap.WaterLevelNorm + zMin;
+                float zMax = zMin + zSpan;
+                //var wLvl = (zSpan + zMin) / 2f; //TODO Use settings landwaterratio
                 
                 Func<Vector2, float> zOf = _p => (d - abcx * _p.x - abcy * _p.y) / abcz;
                 /*
@@ -125,21 +275,21 @@ namespace ioTerraMapGen
                 {
                     for (var x = xCntMin; x <= xCntMax; ++x)
                     {
-                        var pos = new Vector2(x * GridStep.x, y * GridStep.y);
-                        if (!PointInTriangle(pos, _triVerts[0], _triVerts[1], _triVerts[2])) continue;
+                        var pos = new Vector2(x * m_PixStep.x, y * m_PixStep.y);
+                        if (!PointInTriangle(pos, triVertsOS[0], triVertsOS[1], triVertsOS[2])) continue;
                         var pixIdx = y * Width + x;
-                        if (pixIdx >= Pixels.Length)
+                        if (pixIdx >= Pixels.Length) //TODO Shouldn't happen?
                             continue;
                         var z = zOf(pos);
-                        if (z <= wLvl)
-                            Pixels[y * Width + x] = HostMap.BiomeWater.ColTerrain;
+                        if (z <= _zWaterLvl)
+                            Pixels[pixIdx] = Host.TBiome.BiomeWater.ColTerrain;
                         else
                         {
                             
-                            var zNorm = (z - wLvl) / (zMax - wLvl);
-                            var mzIdx = HostMap.SiteBiomeMoistZone[_sIdx];
-                            var col = HostMap.GetBiomeColor(mzIdx, zNorm);
-                            Pixels[y * Width + x] = col;
+                            var zNorm = (z - _zWaterLvl) / (zMax - _zWaterLvl);
+                            var mzIdx = Host.TBiome.SiteBiomeMoistZone[_sIdx];
+                            var col = Host.TBiome.GetBiomeColor(mzIdx, zNorm);
+                            Pixels[pixIdx] = col;
                         }
                             
                     }
@@ -166,8 +316,56 @@ namespace ioTerraMapGen
                 }
                 return s > 0 && t > 0 && (s + t) <= A;
             }
+
+            public class Brush
+            {
+                public enum Shape
+                {
+                    Square,
+                    Circle
+                }
+
+                public Shape shape;
+                public int Size;
+                public Color Color;
+                public List<Vector2> Footprint; //TODO make int coord storage class
+
+                public Brush(Shape _shape, int _size, Color _color)
+                {
+                    shape = _shape;
+                    Size = _size;
+                    Color = _color;
+                    Footprint = new List<Vector2>();
+                    
+                    var rad = Size / 2;
+                    var radSqr = rad * rad;
+
+                    for (int x = -rad; x <= rad; ++x)
+                    {
+                        for (int y = -rad; y <= rad; ++y)
+                        {
+                            var coord = new Vector2(x, y);
+                            if (shape == Shape.Circle)
+                                if (coord.sqrMagnitude > radSqr) continue;
+
+                            Footprint.Add(coord);
+                        }
+                    }
+                }
+                
+            }
+            
+            
         }
     
+    }
+
+    internal static class Ext
+    {
+        internal static Vector2 ToVec2(this Vector3 _v)
+        {
+            return new Vector2(_v.x, _v.y);
+        }
     }
     
 }
