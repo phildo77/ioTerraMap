@@ -18,6 +18,7 @@ namespace ioTerraMapGen
             public TerraMap Host;
             private Vector2 m_PixStep;
             private Vector2 m_PixSize;
+            private Vector2 m_ZeroOffset;
 
             public Progress Prog;
             
@@ -63,6 +64,8 @@ namespace ioTerraMapGen
                 var yStep = bnds.height / Height;
                 m_PixStep = new Vector2(xStep, yStep);
                 m_PixSize = new Vector2(bnds.width / Width, bnds.height / Height);
+                m_ZeroOffset = new Vector2(Host.settings.Bounds.min.x, Host.settings.Bounds.min.y);
+                
                 Pixels = new Color[Width * Height];
                 Pixels = Enumerable.Repeat(new Color(0, 0, 0, 0), Width * Height).ToArray();
 
@@ -126,7 +129,8 @@ namespace ioTerraMapGen
 
             private int[] GetPixelAtWld(Vector2 _pos)
             {
-                return new [] {(int)(_pos.x / m_PixStep.x), (int)(_pos.y / m_PixStep.y)};
+                var posOffset = _pos - m_ZeroOffset;
+                return new [] {(int)(posOffset.x / m_PixStep.x), (int)(posOffset.y / m_PixStep.y)};
             }
             
             private void DrawLine(Vector2 _a, Vector2 _b, Color _col)
@@ -236,9 +240,10 @@ namespace ioTerraMapGen
             //TODO Messy (zspan & unefficient)
             private void PaintTriangle(int _sIdx, Vector3[] _triVerts, float _zMin, float _zSpan, float _zWaterLvl)
             {
-                var wldOffset = new Vector3(Host.settings.Bounds.min.x, Host.settings.Bounds.min.y, 0);
+                
+                var offset = new Vector3(m_ZeroOffset.x, m_ZeroOffset.y);
 
-                var triVertsOS = _triVerts.Select(_tri => _tri - wldOffset).ToArray();
+                var triVertsOS = _triVerts.Select(_tri => _tri - offset).ToArray();
                 
                 var xMin = triVertsOS.Min(_tri => _tri.x);
                 var xMax = triVertsOS.Max(_tri => _tri.x);
