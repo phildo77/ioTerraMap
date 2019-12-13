@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using ioDelaunay;
-using ioUtils;
 
 namespace ioTerraMapGen
 {
@@ -18,8 +17,6 @@ namespace ioTerraMapGen
             public TerraMap Host;
             private Vector2 m_PixStep;
             private Vector2 m_PixSize;
-
-            public Progress Prog;
             
         
             public struct Color
@@ -46,12 +43,8 @@ namespace ioTerraMapGen
                 }
             }
             
-            public TerraTexture(TerraMap _host, Progress.OnUpdate _onUpdate = null)
+            public TerraTexture(TerraMap _host)
             {
-                Prog = new Progress("TerraTexture");
-                var actProg = _onUpdate ?? ((_progPct, _progStr) => { });
-                Prog.SetOnUpdate(actProg);
-                
                 Host = _host;
                 var mesh = Host.TMesh;
                 var bnds = Host.settings.Bounds;
@@ -66,14 +59,12 @@ namespace ioTerraMapGen
                 Pixels = new Color[Width * Height];
                 Pixels = Enumerable.Repeat(new Color(0, 0, 0, 0), Width * Height).ToArray();
 
-                Trace.WriteLine("Init Texture W: " + Width + " H: " + Height);
                 float zMin, zMax;
                 var zSpan = _host.TMesh.GetZSpan(out zMin, out zMax);
                 var tris = mesh.Triangles;
     
                 for (int tvIdx = 0; tvIdx < tris.Length; tvIdx += 3)
                 {
-                    Prog.Update(tvIdx / tris.Length, "Painting Tri " + tvIdx + " of " + tris.Length);
                     var sIdx = tvIdx / 3;
                     //var mstZne = HostMap.SiteBiomeMoistZone[sIdx];
                     //var elvZne = HostMap.SiteBiomeElevZone[sIdx];
@@ -84,7 +75,6 @@ namespace ioTerraMapGen
                 }
                 
                 //Paint Waterways
-                
                 PaintWaterways();
 
             }
@@ -105,21 +95,14 @@ namespace ioTerraMapGen
 
                 float fSpan = fMax - fMin;
 
-                float debugPaintSizeMax = 10;
-                float debugPaintFluxCutoff = 0f;
-                for(int wIdx = 0; wIdx < wws.Length; ++wIdx)
+                foreach (var ww in wws)
                 {
-                    Prog.Update(wIdx / wws.Length, "Painting Waterways");
-                    var ww = wws[wIdx];
                     if (ww.NodeTo == null) continue;
-                    //if (ww.Flux < (fMin + fSpan / 16f)) // TODO in Settings?
-                    //    continue;
-                    var fNorm = (ww.Flux - fMin) / fSpan;
-                    if (fNorm < debugPaintFluxCutoff) continue;
-                    int paintSize = (int)(debugPaintSizeMax * fNorm);
+                    if (ww.Flux < (fMin + fSpan / 16f)) // TODO in Settings?
+                        continue;
                     var a = Host.TMesh.SitePos[ww.SiteIdx].ToVec2();
                     var b = Host.TMesh.SitePos[ww.NodeTo.SiteIdx].ToVec2();
-                    var brush = new Brush(Brush.Shape.Circle, paintSize, new Color(0f,0f,1f)); //TODO Dynamic sizing
+                    var brush = new Brush(Brush.Shape.Circle, 1, new Color(0f,0f,1f)); //TODO Dynamic sizing
                     PaintLineWld(a, b, brush);
                 }
             }
@@ -234,7 +217,7 @@ namespace ioTerraMapGen
             }
     
             //TODO Messy (zspan & unefficient)
-            private void PaintTriangle(int _sIdx, Vector3[] _triVerts, float _zMin, float _zSpan, float _zWaterLvl)
+            private void PaintTriangle(int _sIdx, Vector3[] _triVerts, float zMin, float zSpan, float _zWaterLvl)
             {
                 var wldOffset = new Vector3(Host.settings.Bounds.min.x, Host.settings.Bounds.min.y, 0);
 
@@ -271,7 +254,7 @@ namespace ioTerraMapGen
     
                 var d = abcx * p3.x + abcy * p3.y + abcz * p3.z;
                 
-                float zMax = _zMin + _zSpan;
+                float zMax = zMin + zSpan;
                 //var wLvl = (zSpan + zMin) / 2f; //TODO Use settings landwaterratio
                 
                 Func<Vector2, float> zOf = _p => (d - abcx * _p.x - abcy * _p.y) / abcz;
@@ -288,7 +271,6 @@ namespace ioTerraMapGen
                 */
     
                 //Paint
-                
                 for (var y = yCntMin; y <= yCntMax; ++y)
                 {
                     for (var x = xCntMin; x <= xCntMax; ++x)
@@ -299,13 +281,6 @@ namespace ioTerraMapGen
                         if (pixIdx >= Pixels.Length) //TODO Shouldn't happen?
                             continue;
                         var z = zOf(pos);
-                        
-                        //Debug TODO
-                        float zdPct = (z - _zMin) / _zSpan;
-                        Color dColor = new Color(1f - zdPct, zdPct, 0);
-                        Pixels[pixIdx] = dColor;
-                        
-                        /*
                         if (z <= _zWaterLvl)
                             Pixels[pixIdx] = Host.TBiome.BiomeWater.ColTerrain;
                         else
@@ -316,7 +291,6 @@ namespace ioTerraMapGen
                             var col = Host.TBiome.GetBiomeColor(mzIdx, zNorm);
                             Pixels[pixIdx] = col;
                         }
-                        */
                             
                     }
                 }
