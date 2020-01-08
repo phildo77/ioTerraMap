@@ -1,4 +1,4 @@
-﻿namespace ioTerraMapGen
+﻿namespace ioTerraMap
 {
 using System;
   public struct Vector3 : IEquatable<Vector3>

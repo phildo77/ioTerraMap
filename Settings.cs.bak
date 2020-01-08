@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace ioTerraMapGen
@@ -11,6 +12,7 @@ using ioDelaunay;
         }
         
         
+        [Serializable]
         public class Settings
         {
             //Randomization

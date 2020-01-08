@@ -6,83 +6,52 @@ using Random = System.Random;
 using Rect = ioDelaunay.Rect;
 using ioUtils;
 
-namespace ioTerraMapGen
+namespace ioTerraMap
 {
     using ioDelaunay;
 
     public partial class TerraMap
     {
         
-        public Settings settings;
+        public readonly Settings settings;
         public TerraMesh TMesh;
         public BiomeStuff TBiome;
         public TerraTexture TTex;
-        private Random m_Rnd;
-        public WaterNode[] Waterways;
-        public float WaterSurfaceZ;  //Pct from Min z to Max z
+        
+        public WaterNode[] WaterFlux;
+        public float WaterFluxMax;
+        public float WaterFluxMin => settings.RainfallGlobal;
+        public float WaterFluxSpan => WaterFluxMax - WaterFluxMin;
+        
+        public int[] RiverSites;
 
-        public Progress Prog = new Progress("TerraMap");
-        public TerraMap Generate()
+        private float m_WaterLevelPct;
+
+        public float WaterSurfaceZ => m_WaterLevelPct; //Pct from Min z to Max z - TODO change to actual Z height?
+
+        private TerraMap()
         {
-            return Generate(Settings.Default);
+            settings = Settings.Default;
+        }
+
+        private TerraMap(Settings _settings)
+        {
+            settings = _settings;
         }
         
-        public TerraMap Generate(Settings _settings, Progress.OnUpdate _actProg = null)
+        public Vector3[] GetMeshVertsWaterTop()
         {
-            var actProg = _actProg ?? ((_progPct, _progStr) => { });
-            Prog.SetOnUpdate(actProg);
-            settings = _settings;
-            var seed = settings.Seed ?? (int)DateTime.Now.Ticks;
-            m_Rnd = new Random(seed);
-            TMesh = new TerraMesh(this, actProg);
-            
-            //Land morphing
-
-            Prog.Update(0, "Conifying", true);
-            TMesh.Conify(settings.ConifyStrength);
-            Prog.Update(1, "Conifying", true);
-            var gSlpDir = settings.GlobalSlopeDir == Vector2.zero
-                ? new Vector2((float) (m_Rnd.NextDouble() - 0.5f), (float) (m_Rnd.NextDouble() - 0.5f))
-                : settings.GlobalSlopeDir;
-            
-            Prog.Update(0, "Applying Global Slope", true);
-            TMesh.SlopeGlobal(gSlpDir, settings.GlobalSlopeMag);
-            Prog.Update(1, "Applying Global Slope", true);
-            Prog.Update(0, "Adding Hills / Blobs", true);
-            for (int hIdx = 0; hIdx < settings.HillRndCnt.Count; ++hIdx)
+            var verts = TMesh.ElevatedVerts();
+            for (int idx = 0; idx < verts.Length; ++idx)
             {
-                Prog.Update((float)hIdx / settings.HillRndCnt.Count,"Adding hills / blobs");
-                for (int hCnt = 0; hCnt < settings.HillRndCnt[hIdx]; ++hCnt)
-                    TMesh.Blob(settings.HillRndStr[hIdx], settings.HillRndRad[hIdx]);
+                if (verts[idx].z < WaterSurfaceZ)
+                    verts[idx].Set(verts[idx].x, verts[idx].y, WaterSurfaceZ);
             }
-            Prog.Update(1, "Adding Hills / Blobs", true);
 
-            //Erosion
-
-            Prog.Update(0, "Eroding", true);
-            TMesh.Erode();
-            Prog.Update(1, "Eroding", true);
-            
-            
-            //TODO
-            Prog.Update(0, "Creating Biomes", true);
-            TBiome = new BiomeStuff(this);
-            Prog.Update(1, "Creating Biomes", true);
-            
-            //Calculate Water Level
-            Prog.Update(0, "Calculating Water Level", true);
-            WaterSurfaceZ = TMesh.CalcWaterLevel();
-            Prog.Update(1, "Calculating Water Level", true);
-            
-            //Paint
-            Prog.Update(0, "Creating Map Texture", true);
-            TTex = new TerraTexture(this, actProg);
-            Prog.Update(1, "Creating Map Texture", true);
-            
-            
-            
-            return this; //TODO
+            return verts;
         }
+
+        
         
         
         public class WaterNode

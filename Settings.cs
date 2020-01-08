@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace ioTerraMapGen
+namespace ioTerraMap
 {
 using ioDelaunay;
     public partial class TerraMap
@@ -16,7 +16,8 @@ using ioDelaunay;
         public class Settings
         {
             //Randomization
-            public int? Seed = null;
+            public int Seed;
+            internal Random m_Rnd;
 
             //Size and Bounds
             public Rect Bounds = new Rect(Vector2.one, Vector2.one * 500);
@@ -27,6 +28,20 @@ using ioDelaunay;
             public float MaxErosionRate = 0.010f; //km
             public float MinPDSlope = 0.01f;
             public float LandWaterRatio = 0.7f;
+            public float m_WaterwayThresh = 0.2f;
+
+            public float WaterwayThresh
+            {
+                get
+                {
+                    return m_WaterwayThresh;
+                }
+                set
+                {
+                    if (value < 0) m_WaterwayThresh = 0f;
+                    else if (value > 1f) m_WaterwayThresh = 1f;
+                }
+            }
             
             //Land Morphing
             public float ConifyStrength = 15f;
@@ -50,6 +65,19 @@ using ioDelaunay;
             {
                 
             };
+
+            public Settings()
+            {
+                Seed = Guid.NewGuid().GetHashCode();
+                m_Rnd = new Random(Seed);
+            }
+
+            public Settings(int _seed)
+            {
+                Seed = _seed;
+                m_Rnd = new Random(Seed);
+
+            }
         }
 
     }

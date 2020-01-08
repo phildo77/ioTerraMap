@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using Random = System.Random;
+using ioUtils;
 
 namespace ioTerraMapGen
 {
@@ -18,15 +19,28 @@ namespace ioTerraMapGen
             public TerraMap Host;
             public Settings settings => Host.settings;
             private Random m_Rnd => Host.m_Rnd;
-            public Vector3[] SitePos;
-            public Vector3[] PlanchDarb;
+            public Vector3[] PlanchDarb; //TODO private?
+            
+            ///Site / Triangle vertices
             public Vector2[] CornerPos;
+            
+            ///Centroid position of Triangle / Site
+            public Vector3[] SitePos;
+            
+            ///Indexes of neighbor sites
             public int[][] SiteNbrs;
+            
+            //Indexes of corner vertices
             public int[][] SiteCrns;
+            
+            //Hashtable of sites sharing vertex
             public HashSet<int>[] SitesHavingCorner;
+            
+            //Mesh Triangle vertex by index clockwise
             public readonly int[] Triangles;
 
-    
+            public Progress Prog;
+
             public int[] TrianglesCCW
             {
                 get
@@ -64,16 +78,21 @@ namespace ioTerraMapGen
                             
                         sPoss.Add(_sitePoss[sIdx]);
                         if(HullSites.Contains(sIdx))
-                            Trace.WriteLine("Debug"); //TODO Debug
+                            Trace.WriteLine("Debug Hullsites2"); //TODO Debug
                     }
                     cornZs[cIdx] = sPoss.Average(_sPos => _sPos.z);
                 }
     
                 return cornZs.Select((_z, _idx) => new Vector3(CornerPos[_idx].x, CornerPos[_idx].y, _z)).ToArray();
             }
+
             
-            public TerraMesh(TerraMap _hostMap)
+            public TerraMesh(TerraMap _hostMap, Progress.OnUpdate _actProg = null)
             {
+                var actProg = _actProg ?? ((_progPct, _progStr) => { });
+                Prog = new Progress("TerraMesh");
+                Prog.SetOnUpdate(actProg);
+                
                 Host = _hostMap;
 
                 var bnds = Host.settings.Bounds;
@@ -83,14 +102,21 @@ namespace ioTerraMapGen
                 var ySpanCount = ySize * settings.Resolution;
                 int pntCnt = (int)(xSpanCount * ySpanCount);
     
-    
+                
+                Prog.Update(0, "Generating Random Point Map");
     
                 var points = new List<Vector2>(pntCnt);
-    
+
                 for (int pIdx = 0; pIdx < pntCnt; ++pIdx)
+                {
                     points.Add(RndVec2(bnds));
+                    Prog.Update((float) pIdx / pntCnt);
+                }
+                    
                 
+                //TODO prune for dupes?
                 var del = Delaunay.Create<CircleSweep>(points);
+                del.Prog.SetOnUpdate(actProg);
                 del.Triangulate();
                 var vor = new Voronoi(del);
                 vor.Build();
@@ -103,6 +129,7 @@ namespace ioTerraMapGen
                 Triangles = dMesh.Triangles;
                 
                 //Index Delaunay triangles
+                Prog.Update(0, "Indexing Tris");
                 var triRef = new Dictionary<Delaunay.Triangle, int>();
                 var tris = new List<Delaunay.Triangle>();
                 var triScan = del.LastTri;
@@ -113,6 +140,7 @@ namespace ioTerraMapGen
                     tris.Add(triScan);
                     triRef.Add(triScan, tsCnt++);
                     triScan = triScan.PrevTri;
+                    Prog.Update((float)tsCnt / Triangles.Length);
                 }
                     
                 
@@ -122,6 +150,7 @@ namespace ioTerraMapGen
                 SiteCrns = new int[tsCnt][];
                 SiteNbrs = new int[tsCnt][];
                 SitesHavingCorner = new HashSet<int>[CornerPos.Length];
+                Prog.Update(0, "Filling Neighbors");
                 while (triScan != null)
                 {
                     var tIdx = triRef[triScan];
@@ -152,12 +181,18 @@ namespace ioTerraMapGen
                             SiteNbrs[tIdx][eIdx] = SITE_IDX_NULL;
                     }
                     triScan = triScan.PrevTri;
+                    Prog.Update((float) tsCnt / Triangles.Length);
                 }
                 
                 //Outer hull
+                Prog.Update(0, "Scanning Hull");
                 var hullSites = new List<int>();
-                foreach (var edge in del.HullEdges)
-                    hullSites.Add(triRef[edge.Triangle]);
+                for(int hIdx = 0; hIdx < del.HullEdges.Count; ++hIdx)
+                {
+                    hullSites.Add(triRef[del.HullEdges[hIdx].Triangle]);
+                    Prog.Update((float) hIdx / del.HullEdges.Count);
+                }
+                    
                     
                 HullSites = hullSites.ToArray();
             }
@@ -175,14 +210,16 @@ namespace ioTerraMapGen
                     return (xStr + yStr) * _strength / 4f;
                 };
     
+                Prog.Update(0,"Global Slope");
                 for (int sIdx = 0; sIdx < SitePos.Length; ++sIdx)
                 {
                     if (HullSites.Contains(sIdx))
-                        Trace.Write("Debug"); //TODO DEbug
+                        Trace.WriteLine("Debug Hullsites"); //TODO DEbug
                     var sitePos = SitePos[sIdx];
                     var zShift = strf(sitePos);
                     var newZ = sitePos.z + zShift;
                     SitePos[sIdx].z = newZ;
+                    Prog.Update((float) sIdx / SitePos.Length);
                 }
             }
             
@@ -196,11 +233,13 @@ namespace ioTerraMapGen
                     return magScal * _strength / 2f;
                 };
                 
+                Prog.Update(0, "Conifying");
                 for (int sIdx = 0; sIdx < SitePos.Length; ++sIdx)
                 {
                     var sPos = SitePos[sIdx];
                     var zShift = zAdder(new Vector2(sPos.x, sPos.y));
                     SitePos[sIdx].z = SitePos[sIdx].z + zShift;
+                    Prog.Update((float) sIdx / SitePos.Length);
                 }
             }
             
@@ -363,6 +402,8 @@ namespace ioTerraMapGen
                 return zCheck;
             }
 
+            
+
             private void CalcWaterFlux(Vector3[] _waterSurface)
             {
                 Host.Waterways = new WaterNode[SitePos.Length];
@@ -383,15 +424,22 @@ namespace ioTerraMapGen
                 }
                     
                 Array.Sort(pIdxByHt, (_a, _b) => _waterSurface[_b].z.CompareTo(_waterSurface[_a].z));
+
+                var dbgHtArr = new float[pIdxByHt.Length];
+
+                for (int idx = 0; idx < pIdxByHt.Length; idx++)
+                    dbgHtArr[idx] = _waterSurface[pIdxByHt[idx]].z;
+                    
                 
                 for (int hIdx = 0; hIdx < SitePos.Length; ++hIdx)
                 {
                     var pIdx = pIdxByHt[hIdx];
                     var w = _waterSurface[pIdx];
                     
-                    //Find downhill
+                    //Find biggest slope neighbor
                     var minNIdx = -1;
-                    var maxNSlp = 0f;
+                    //var maxNSlp = 0f;
+                    float maxZdiff = 0;
                     foreach (var nIdx in SiteNbrs[pIdx])
                     {
                         if (nIdx == SITE_IDX_NULL) continue;
@@ -399,6 +447,13 @@ namespace ioTerraMapGen
                         
                         if (n.z <= w.z)
                         {
+                            var diff = w.z - n.z;
+                            if (diff > maxZdiff)
+                            {
+                                maxZdiff = diff;
+                                minNIdx = nIdx;
+                            }
+                            /*  Use slope - (Not working?)
                             var vec = n - w;
                             var run = (float) Math.Sqrt(vec.x * vec.x + vec.y * vec.y);
                             var rise = w.z - n.z;
@@ -408,6 +463,7 @@ namespace ioTerraMapGen
                                 minNIdx = nIdx;
                                 maxNSlp = slp;
                             }
+                            */
                         }
                     }
     
@@ -415,7 +471,10 @@ namespace ioTerraMapGen
                         continue;
                     if (minNIdx == pIdx)  //TODO DEBUG
                         continue;
+                    
+                    //Add this nodes flux to downhill neighbor
                     Host.Waterways[minNIdx].Flux += Host.Waterways[pIdx].Flux;
+                    //Set waterway direction
                     Host.Waterways[pIdx].NodeTo = Host.Waterways[minNIdx];
                 }
             }

@@ -1,4 +1,4 @@
-namespace ioTerraMapGen
+namespace ioTerraMap
 {
     public partial class TerraMap
     {

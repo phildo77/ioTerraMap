@@ -5,7 +5,7 @@ using System.Linq;
 using ioDelaunay;
 using ioUtils;
 
-namespace ioTerraMapGen
+namespace ioTerraMap
 {
     public partial class TerraMap
     {
@@ -88,13 +88,45 @@ namespace ioTerraMapGen
                 
                 //Paint Waterways
                 
-                PaintWaterways();
+                PaintRivers();
 
             }
-    
+
+            private void PaintRivers()
+            {
+                float fMin = float.PositiveInfinity;
+                float fMax = float.NegativeInfinity;
+                foreach (var ww in Host.WaterFlux)
+                {
+                    if (ww.Flux < fMin)
+                        fMin = ww.Flux;
+                    if (ww.Flux > fMax)
+                        fMax = ww.Flux;
+                }
+
+                float fSpan = fMax - fMin;
+
+                float debugPaintSizeMax = 10;
+                
+                for(int rIdx = 0; rIdx < Host.RiverSites.Length; ++rIdx)
+                {
+                    Prog.Update((float)rIdx / Host.RiverSites.Length, "Painting Waterways");
+                    var sIdx = Host.RiverSites[rIdx];
+                    var ww = Host.WaterFlux[sIdx];
+                    if (ww.NodeTo == null) continue;
+                    var fNorm = (ww.Flux - fMin) / fSpan; //TODO use river ww span (not total)
+                    int paintSize = (int)(debugPaintSizeMax * fNorm);
+                    var a = Host.TMesh.SitePos[ww.SiteIdx].ToVec2();
+                    var b = Host.TMesh.SitePos[ww.NodeTo.SiteIdx].ToVec2();
+                    var colWater = Host.TBiome.BiomeWater.ColTerrain;
+                    var brush = new Brush(Brush.Shape.Circle, paintSize, colWater); //TODO Dynamic sizing
+                    PaintLineWld(a, b, brush);
+                }
+                
+            }
             private void PaintWaterways()
             {
-                var wws = Host.Waterways;
+                var wws = Host.WaterFlux;
 
                 float fMin = float.PositiveInfinity;
                 float fMax = float.NegativeInfinity;
@@ -109,7 +141,8 @@ namespace ioTerraMapGen
                 float fSpan = fMax - fMin;
 
                 float debugPaintSizeMax = 10;
-                float debugPaintFluxCutoff = 0f;
+                //float debugPaintFluxCutoff = 0f;
+                float debugPaintFluxCutoff = fSpan * 0.1f;
                 for(int wIdx = 0; wIdx < wws.Length; ++wIdx)
                 {
                     Prog.Update(wIdx / wws.Length, "Painting Waterways");
@@ -119,6 +152,7 @@ namespace ioTerraMapGen
                     //    continue;
                     var fNorm = (ww.Flux - fMin) / fSpan;
                     if (fNorm < debugPaintFluxCutoff) continue;
+                    if (Host.TMesh.SitePos[ww.SiteIdx].z < Host.WaterSurfaceZ) continue;
                     int paintSize = (int)(debugPaintSizeMax * fNorm);
                     var a = Host.TMesh.SitePos[ww.SiteIdx].ToVec2();
                     var b = Host.TMesh.SitePos[ww.NodeTo.SiteIdx].ToVec2();
@@ -305,23 +339,23 @@ namespace ioTerraMapGen
                             continue;
                         var z = zOf(pos);
                         
-                        //Debug TODO
+                        /*
+                        //Debug TODO - paint color as heightmap
                         float zdPct = (z - _zMin) / _zSpan;
                         Color dColor = new Color(1f - zdPct, zdPct, 0);
                         Pixels[pixIdx] = dColor;
+                        */
                         
-                        /*
                         if (z <= _zWaterLvl)
                             Pixels[pixIdx] = Host.TBiome.BiomeWater.ColTerrain;
                         else
                         {
-                            
                             var zNorm = (z - _zWaterLvl) / (zMax - _zWaterLvl);
                             var mzIdx = Host.TBiome.SiteBiomeMoistZone[_sIdx];
                             var col = Host.TBiome.GetBiomeColor(mzIdx, zNorm);
                             Pixels[pixIdx] = col;
                         }
-                        */
+                        
                             
                     }
                 }
