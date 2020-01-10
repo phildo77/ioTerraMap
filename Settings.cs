@@ -78,6 +78,15 @@ using ioDelaunay;
                 m_Rnd = new Random(Seed);
 
             }
+            
+            public static Vector2 RndVec2(Rect _bounds, System.Random _rnd)
+            {
+                var xSize = _bounds.width;
+                var ySize = _bounds.height;
+                var x = (float) (_rnd.NextDouble() * xSize) + _bounds.min.x;
+                var y = (float)(_rnd.NextDouble() * ySize) + _bounds.min.y;
+                return new Vector2(x, y);
+            }
         }
 
     }

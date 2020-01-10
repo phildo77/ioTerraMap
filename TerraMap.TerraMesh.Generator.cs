@@ -41,7 +41,7 @@ namespace ioTerraMap
 
                     for (int pIdx = 0; pIdx < pntCnt; ++pIdx)
                     {
-                        points.Add(Geom.RndVec2(bnds, _settings.m_Rnd));
+                        points.Add(Settings.RndVec2(bnds, _settings.m_Rnd));
                         prog.Update((float) pIdx / pntCnt);
                     }
                         
@@ -267,7 +267,95 @@ namespace ioTerraMap
                 }
                 
             }
-            
+
+            public static void Slice(TerraMesh _tMesh, int _maxVertCount, out int[][] _triIdxs)
+            {
+                //Check if already meet max vert count
+                if (_tMesh.CornerPos.Length <= _maxVertCount)
+                {
+                    _triIdxs = new int[1][];
+                    _triIdxs[0] = _tMesh.Triangles;
+                    return;
+                }
+                
+                var bndRect = new Rect(_tMesh.m_Bounds.min.x, _tMesh.m_Bounds.min.y,
+                    _tMesh.m_Bounds.size.x, _tMesh.m_Bounds.size.y);
+                
+                //Find correct slice count (2x2, 3x3, 4x4, etc.)
+                var rowCnt = 2;
+                int boxCnt;
+                Dictionary<int, int> vIdxToMIdx;
+                while (true)
+                {
+                    var nextRowCnt = false;
+                    boxCnt = rowCnt * rowCnt;
+                    var sliceWidth = bndRect.width / rowCnt;
+                    var sliceHeight = bndRect.height / rowCnt;
+                    var vertsPerBox = new int[boxCnt];
+                    vIdxToMIdx = new Dictionary<int, int>();
+
+                    for (var lIdx = 0; lIdx < boxCnt; ++lIdx)
+
+                    for (int vIdx = 0; vIdx < _tMesh.CornerPos.Length; ++vIdx)
+                    {
+                        var curVert = _tMesh.CornerPos[vIdx];
+                        
+                        //Find Col
+                        for (int xScanIdx = 1; xScanIdx <= rowCnt; ++xScanIdx)
+                        {
+                            var xMax = xScanIdx * sliceWidth;
+                            if (curVert.x > xMax) continue;
+                            
+                            //Find Row
+                            for (int yScanIdx = 1; yScanIdx <= rowCnt; ++yScanIdx)
+                            {
+                                var yMax = yScanIdx * sliceHeight;
+                                if (curVert.y > yMax) continue;
+
+                                var meshIdx = ((yScanIdx - 1) * rowCnt) + (xScanIdx - 1);
+                                vertsPerBox[meshIdx]++;
+                                if (vertsPerBox[meshIdx] >= _maxVertCount)
+                                {
+                                    nextRowCnt = true;
+                                    break;
+                                }
+
+                                vIdxToMIdx.Add(vIdx, meshIdx);
+                            }
+
+                            if (nextRowCnt) break;
+
+                        }
+
+                        if (nextRowCnt) break;
+
+                    }
+
+                    if (!nextRowCnt) break;
+
+
+                }
+
+                boxCnt = rowCnt * rowCnt;
+                var triIdx = new List<int>[boxCnt];
+                var tris = _tMesh.Triangles;
+                for (int tIdx = 0; tIdx < tris.Length; tIdx += 3)
+                {
+                    var idxa = tris[tIdx];
+                    var idxb = tris[tIdx + 1];
+                    var idxc = tris[tIdx + 2];
+                    var meshBoxIdx = vIdxToMIdx[idxa];
+                    triIdx[meshBoxIdx].Add(idxa);
+                    triIdx[meshBoxIdx].Add(idxb);
+                    triIdx[meshBoxIdx].Add(idxc);
+                }
+
+                _triIdxs = new int[boxCnt][];
+                for (int boxIdx = 0; boxIdx < boxCnt; ++boxIdx)
+                    _triIdxs[boxIdx] = triIdx[boxIdx].ToArray();
+                
+                
+            }
         }
     }
 

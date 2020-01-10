@@ -22,6 +22,8 @@ namespace ioTerraMap
             
             ///Site / Triangle vertices
             public Vector2[] CornerPos;
+            //Mesh Triangle vertex by index clockwise
+            public readonly int[] Triangles;
             
             ///Centroid position of Triangle / Site
             public Vector3[] SitePos;
@@ -35,8 +37,7 @@ namespace ioTerraMap
             //Hashtable of sites sharing vertex
             public HashSet<int>[] SitesHavingCorner;
             
-            //Mesh Triangle vertex by index clockwise
-            public readonly int[] Triangles;
+            
 
             private Bounds m_Bounds;
 
@@ -60,7 +61,12 @@ namespace ioTerraMap
             }
             public int[] HullSites;
     
-    
+            /// <summary>
+            /// **Expensive operation**
+            /// Height information is stored at centroid of site (Triangle) - this calculates and returns
+            /// the elevation of the vertices of the mesh (cornerPos)
+            /// </summary>
+            /// <returns>Elevated vertices of the mesh</returns>
             public Vector3[] ElevatedVerts()
             {
                 return ElevatedVerts(SitePos);

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using ioDelaunay;
@@ -69,7 +68,7 @@ namespace ioTerraMap
                     {
                         
                         TerraMesh.Modify.Blob(tMesh, settings.HillRndStr[hIdx], settings.HillRndRad[hIdx],
-                            Geom.RndVec2(rectXY,settings.m_Rnd));
+                            Settings.RndVec2(rectXY,settings.m_Rnd));
                     }
                         
                 }
