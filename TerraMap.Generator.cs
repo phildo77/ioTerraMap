@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
-using ioDelaunay;
 using ioUtils;
+using Rect = ioDelaunay.Rect;
+using Vector2 = ioDelaunay.Vector2;
 
 namespace ioTerraMap
 {
@@ -22,22 +24,24 @@ namespace ioTerraMap
             {
                 var gen = new Generator();
                 gen.m_TerraMap = new TerraMap(_settings);
+                Trace.WriteLine("Generating new TerraMap with Seed " + _settings.Seed);
                 gen.m_Prog = new Progress("TerraMap");
-                gen.m_TerraMapGenThread = new Thread(() => { gen.GenerateTMesh(_settings, _onComplete, _actProg); });
+                gen.m_TerraMapGenThread = new Thread(() => { GenerateTMesh(gen, _onComplete, _actProg); });
                 gen.m_TerraMapGenThread.Start();
             }
             
-            private void GenerateTMesh(Settings _settings, Generator.OnComplete _onComplete, Progress.OnUpdate _onUpdate = null)
+            private static void GenerateTMesh(Generator _gen, Generator.OnComplete _onComplete, Progress.OnUpdate _onUpdate = null)
             {
                 var onUpdate = _onUpdate ?? ((_progPct, _progStr) => { });
-                m_Prog.SetOnUpdate(onUpdate);
-                TerraMesh.Generator.OnComplete tMeshOnComplete = _tMesh =>
+                _gen.m_Prog.SetOnUpdate(onUpdate);
+
+                void TMeshOnComplete(TerraMesh _tMesh)
                 {
-                    m_TerraMap.TMesh = _tMesh;
-                    ApplyRandomLandFeatures(onUpdate, _onComplete);
-                };
-                
-                TerraMesh.Generator.Generate(m_TerraMap.settings, onUpdate, tMeshOnComplete);
+                    _gen.m_TerraMap.TMesh = _tMesh;
+                    _gen.ApplyRandomLandFeatures(onUpdate, _onComplete);
+                }
+
+                TerraMesh.Generator.Generate(_gen.m_TerraMap.settings, onUpdate, TMeshOnComplete);
                 
             }
             

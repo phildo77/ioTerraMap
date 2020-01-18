@@ -16,7 +16,16 @@ using ioDelaunay;
         public class Settings
         {
             //Randomization
-            public int Seed;
+            private int m_Seed;
+            public int Seed
+            {
+                get => m_Seed;
+                set
+                {
+                    m_Seed = value;
+                    m_Rnd = new Random(m_Seed);
+                }
+            }
             internal Random m_Rnd;
 
             //Size and Bounds
@@ -69,13 +78,11 @@ using ioDelaunay;
             public Settings()
             {
                 Seed = Guid.NewGuid().GetHashCode();
-                m_Rnd = new Random(Seed);
             }
 
             public Settings(int _seed)
             {
                 Seed = _seed;
-                m_Rnd = new Random(Seed);
 
             }
             

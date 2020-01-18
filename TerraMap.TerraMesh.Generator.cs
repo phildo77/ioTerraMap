@@ -278,15 +278,13 @@ namespace ioTerraMap
                 
             }
 
-            public static void Slice(TerraMesh _tMesh, int _maxVertCount, out int[][] _triIdxs, out Vector2[][] _uv)
+            public static void Slice(TerraMesh _tMesh, int _maxVertCount, out int[][] _triIdxs)
             {
                 //Check if already meet max vert count
                 if (_tMesh.CornerPos.Length <= _maxVertCount)
                 {
                     _triIdxs = new int[1][];
                     _triIdxs[0] = _tMesh.Triangles;
-                    _uv = new Vector2[1][];
-                    _uv[0] = _tMesh.UV;
                     return;
                 }
                 
@@ -308,8 +306,6 @@ namespace ioTerraMap
                     var vertsPerBox = new int[boxCnt];
                     vIdxToMIdx = new Dictionary<int, int>();
 
-                    for (var lIdx = 0; lIdx < boxCnt; ++lIdx)
-
                     for (int vIdx = 0; vIdx < _tMesh.CornerPos.Length; ++vIdx)
                     {
                         var curVert = _tMesh.CornerPos[vIdx];
@@ -317,6 +313,7 @@ namespace ioTerraMap
                         //Find Col
                         for (int xScanIdx = 1; xScanIdx <= rowCnt; ++xScanIdx)
                         {
+                            var pointBoxed = false;
                             var xMax = xScanIdx * sliceWidth;
                             if (curVert.x > xMax) continue;
                             
@@ -335,9 +332,11 @@ namespace ioTerraMap
                                 }
 
                                 vIdxToMIdx.Add(vIdx, meshIdx);
+                                pointBoxed = true;
+                                break;
                             }
 
-                            if (nextRowCnt) break;
+                            if (nextRowCnt || pointBoxed) break;
 
                         }
 
@@ -346,27 +345,16 @@ namespace ioTerraMap
                     }
 
                     if (!nextRowCnt) break;
-
+                    rowCnt++;
 
                 }
 
                 boxCnt = rowCnt * rowCnt;
                 var triIdx = new List<int>[boxCnt];
                 var tris = _tMesh.Triangles;
-                var sliceSize = new Vector2(sliceWidth, sliceHeight);
-                _uv = new Vector2[boxCnt][];
-
-                var boxRects = new Rect[boxCnt];
                 
-                //Set up mesh bounds
-                for (int boxIdx = 0; boxIdx < boxCnt; ++boxIdx)
-                {
-                    int xIdx;
-                    var yIdx = Math.DivRem(boxIdx, boxCnt, out xIdx);
-
-                    boxRects[boxIdx] = new Rect(sliceSize.x * xIdx, sliceSize.y * yIdx, sliceSize.x, sliceSize.y);
-                    _uv[boxIdx] = new Vector2[_tMesh.CornerPos.Length];
-                }
+                for(int boxIdx = 0; boxIdx < boxCnt; ++boxIdx)
+                    triIdx[boxIdx] = new List<int>();
                 
                 for (int tIdx = 0; tIdx < tris.Length; tIdx += 3)
                 {
@@ -378,15 +366,6 @@ namespace ioTerraMap
                     triIdx[meshBoxIdx].Add(idxb);
                     triIdx[meshBoxIdx].Add(idxc);
                     
-                    //uv TODO needs testing
-                    var posOS = _tMesh.CornerPos[idxa] - boxRects[meshBoxIdx].min;
-                    _uv[meshBoxIdx][idxa] = new Vector2(posOS.x / sliceWidth, posOS.y / sliceHeight);
-
-                    posOS = _tMesh.CornerPos[idxb] - boxRects[meshBoxIdx].min;
-                    _uv[meshBoxIdx][idxb] = new Vector2(posOS.x / sliceWidth, posOS.y / sliceHeight);
-                    
-                    posOS = _tMesh.CornerPos[idxc] - boxRects[meshBoxIdx].min;
-                    _uv[meshBoxIdx][idxc] = new Vector2(posOS.x / sliceWidth, posOS.y / sliceHeight);
                 }
 
                 _triIdxs = new int[boxCnt][];
