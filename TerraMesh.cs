@@ -24,6 +24,8 @@ namespace ioTerraMap
             public Vector2[] CornerPos;
             //Mesh Triangle vertex by index clockwise
             public readonly int[] Triangles;
+
+            public Vector2[] UV;
             
             ///Centroid position of Triangle / Site
             public Vector3[] SitePos;

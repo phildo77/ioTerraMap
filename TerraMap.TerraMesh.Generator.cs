@@ -131,6 +131,16 @@ namespace ioTerraMap
                     var bndSize = new Vector3(del.BoundsRect.width, del.BoundsRect.height);
                     tMesh.m_Bounds = new Bounds(bndCent, bndSize);
 
+                    
+                    //UV
+                    tMesh.UV = new Vector2[tMesh.CornerPos.Length];
+                    var relOS = new Vector2(tMesh.m_Bounds.min.x, tMesh.m_Bounds.min.y);
+                    for (int pIdx = 0; pIdx < tMesh.CornerPos.Length; ++pIdx)
+                    {
+                        var relPos = tMesh.CornerPos[pIdx] - relOS;
+                        var uvPos = new Vector2(relPos.x / tMesh.m_Bounds.size.x, relPos.y / tMesh.m_Bounds.size.y);
+                        tMesh.UV[pIdx] = uvPos;
+                    }
                     //Done
                     _onComplete(tMesh);
                 }
@@ -268,13 +278,15 @@ namespace ioTerraMap
                 
             }
 
-            public static void Slice(TerraMesh _tMesh, int _maxVertCount, out int[][] _triIdxs)
+            public static void Slice(TerraMesh _tMesh, int _maxVertCount, out int[][] _triIdxs, out Vector2[][] _uv)
             {
                 //Check if already meet max vert count
                 if (_tMesh.CornerPos.Length <= _maxVertCount)
                 {
                     _triIdxs = new int[1][];
                     _triIdxs[0] = _tMesh.Triangles;
+                    _uv = new Vector2[1][];
+                    _uv[0] = _tMesh.UV;
                     return;
                 }
                 
@@ -284,13 +296,15 @@ namespace ioTerraMap
                 //Find correct slice count (2x2, 3x3, 4x4, etc.)
                 var rowCnt = 2;
                 int boxCnt;
+                float sliceWidth;
+                float sliceHeight;
                 Dictionary<int, int> vIdxToMIdx;
                 while (true)
                 {
                     var nextRowCnt = false;
                     boxCnt = rowCnt * rowCnt;
-                    var sliceWidth = bndRect.width / rowCnt;
-                    var sliceHeight = bndRect.height / rowCnt;
+                    sliceWidth = bndRect.width / rowCnt;
+                    sliceHeight = bndRect.height / rowCnt;
                     var vertsPerBox = new int[boxCnt];
                     vIdxToMIdx = new Dictionary<int, int>();
 
@@ -339,6 +353,21 @@ namespace ioTerraMap
                 boxCnt = rowCnt * rowCnt;
                 var triIdx = new List<int>[boxCnt];
                 var tris = _tMesh.Triangles;
+                var sliceSize = new Vector2(sliceWidth, sliceHeight);
+                _uv = new Vector2[boxCnt][];
+
+                var boxRects = new Rect[boxCnt];
+                
+                //Set up mesh bounds
+                for (int boxIdx = 0; boxIdx < boxCnt; ++boxIdx)
+                {
+                    int xIdx;
+                    var yIdx = Math.DivRem(boxIdx, boxCnt, out xIdx);
+
+                    boxRects[boxIdx] = new Rect(sliceSize.x * xIdx, sliceSize.y * yIdx, sliceSize.x, sliceSize.y);
+                    _uv[boxIdx] = new Vector2[_tMesh.CornerPos.Length];
+                }
+                
                 for (int tIdx = 0; tIdx < tris.Length; tIdx += 3)
                 {
                     var idxa = tris[tIdx];
@@ -348,6 +377,16 @@ namespace ioTerraMap
                     triIdx[meshBoxIdx].Add(idxa);
                     triIdx[meshBoxIdx].Add(idxb);
                     triIdx[meshBoxIdx].Add(idxc);
+                    
+                    //uv TODO needs testing
+                    var posOS = _tMesh.CornerPos[idxa] - boxRects[meshBoxIdx].min;
+                    _uv[meshBoxIdx][idxa] = new Vector2(posOS.x / sliceWidth, posOS.y / sliceHeight);
+
+                    posOS = _tMesh.CornerPos[idxb] - boxRects[meshBoxIdx].min;
+                    _uv[meshBoxIdx][idxb] = new Vector2(posOS.x / sliceWidth, posOS.y / sliceHeight);
+                    
+                    posOS = _tMesh.CornerPos[idxc] - boxRects[meshBoxIdx].min;
+                    _uv[meshBoxIdx][idxc] = new Vector2(posOS.x / sliceWidth, posOS.y / sliceHeight);
                 }
 
                 _triIdxs = new int[boxCnt][];
