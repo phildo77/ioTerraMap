@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Threading;
 using ioUtils;
 using Rect = ioDelaunay.Rect;
 using Vector2 = ioDelaunay.Vector2;
@@ -14,7 +13,6 @@ namespace ioTerraMap
         public class Generator
         {
             private Progress m_Prog;
-            private Thread m_TerraMapGenThread;
             private TerraMap m_TerraMap;
             public delegate void OnComplete(TerraMap _map);
 
@@ -26,8 +24,7 @@ namespace ioTerraMap
                 gen.m_TerraMap = new TerraMap(_settings);
                 Trace.WriteLine("Generating new TerraMap with Seed " + _settings.Seed);
                 gen.m_Prog = new Progress("TerraMap");
-                gen.m_TerraMapGenThread = new Thread(() => { GenerateTMesh(gen, _onComplete, _actProg); });
-                gen.m_TerraMapGenThread.Start();
+                GenerateTMesh(gen, _onComplete, _actProg);
             }
             
             private static void GenerateTMesh(Generator _gen, Generator.OnComplete _onComplete, Progress.OnUpdate _onUpdate = null)

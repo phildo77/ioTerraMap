@@ -1,15 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using Random = System.Random;
-using Rect = ioDelaunay.Rect;
-using ioUtils;
-
 namespace ioTerraMap
 {
-    using ioDelaunay;
-
     public partial class TerraMap
     {
         

@@ -1,10 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using ioUtils;
-using Random = System.Random;
 using ioDelaunay;
-using System.Linq;
 
 namespace ioTerraMap
 {

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Threading;
 using ioDelaunay;
 using ioTerraMap;
 using NUnit.Framework;
@@ -32,7 +33,8 @@ namespace ioTerraMapTest
                 finishedMap = _tMap;
                 isDone = true;
             };
-            TerraMap.Generator.Generate(sets, onComplete, progOnUpdate);
+            Thread genThread = new Thread(() => TerraMap.Generator.Generate(sets, onComplete, progOnUpdate));
+            genThread.Start();
 
             while (isDone == false)
             {
