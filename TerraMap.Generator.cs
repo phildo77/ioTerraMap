@@ -115,7 +115,7 @@ namespace ioTerraMap
                 var pdSurface = TerraMesh.PlanchonDarboux(_tMap.TMesh, _tMap.settings.MinPDSlope, _onUpdate);
                 
                 //Calc water flux
-                var sitePos = _tMap.TMesh.SitePos;
+                var sitePos = _tMap.TMesh.SitePositions;
                 _tMap.WaterFlux = new WaterNode[sitePos.Length];
                 
                 //Init waterflux and heightmap - TODO sort not needed?
@@ -147,10 +147,10 @@ namespace ioTerraMap
                     var minNIdx = -1;
                     //var maxNSlp = 0f;
                     float maxZdiff = 0;
-                    var siteNbrs = _tMap.TMesh.SiteNbrs;
+                    var siteNbrs = _tMap.TMesh.SiteNeighbors;
                     foreach (var nIdx in siteNbrs[pIdx])
                     {
-                        if (nIdx == TerraMesh.SITE_IDX_NULL) continue;
+                        if (nIdx == TerraMesh.SiteIdxNull) continue;
                         var n = pdSurface[nIdx];
                         
                         if (n.z <= w.z)
@@ -208,7 +208,7 @@ namespace ioTerraMap
                 var zMax = float.NegativeInfinity;
                 
                 //Find min max z TODO save from previous operation?
-                foreach (var site in tMesh.SitePos)
+                foreach (var site in tMesh.SitePositions)
                 {
                     if (site.z < zMin)
                         zMin = site.z;
@@ -225,7 +225,7 @@ namespace ioTerraMap
                     
                     var aboveCnt = 0;
                     var belowCnt = 0;
-                    foreach (var site in tMesh.SitePos)
+                    foreach (var site in tMesh.SitePositions)
                     {
                         if (site.z > zCheck)
                             aboveCnt++;
@@ -251,7 +251,7 @@ namespace ioTerraMap
                     break;
                 }
 
-                _tMap.m_WaterLevelPct = zCheck;
+                _tMap.WaterSurfaceZ = zCheck;
             }
             
             public static void PlaceRivers(TerraMap _tMap, float _fluxThresh)
@@ -259,7 +259,7 @@ namespace ioTerraMap
                 var wwList = new List<WaterNode>(_tMap.WaterFlux);
             
                 //Prune ocean sites
-                wwList.RemoveAll(_wn => _tMap.TMesh.SitePos[_wn.SiteIdx].z < _tMap.WaterSurfaceZ);
+                wwList.RemoveAll(_wn => _tMap.TMesh.SitePositions[_wn.SiteIdx].z < _tMap.WaterSurfaceZ);
                 wwList.Sort((_a, _b) => _b.Flux.CompareTo(_a.Flux));
 
                 //Calc flux cutoff

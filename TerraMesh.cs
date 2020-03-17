@@ -10,35 +10,31 @@ namespace ioTerraMap
 
     public partial class TerraMap
     {
-        
+        [Serializable]
         public partial class TerraMesh
         {
 
-            
-            
-            public const int SITE_IDX_NULL = -1;
+            public const int SiteIdxNull = -1;
             
             ///Site / Triangle vertices
-            public Vector2[] CornerPos;
+            public Vector2[] Vertices;
             //Mesh Triangle vertex by index clockwise
             public readonly int[] Triangles;
 
             public Vector2[] UV;
             
             ///Centroid position of Triangle / Site
-            public Vector3[] SitePos;
+            public Vector3[] SitePositions;
             
             ///Indexes of neighbor sites
-            public int[][] SiteNbrs;
+            public int[][] SiteNeighbors;
             
             //Indexes of corner vertices
-            public int[][] SiteCrns;
+            public int[][] SiteCorners;
             
             //Hashtable of sites sharing vertex
             public HashSet<int>[] SitesHavingCorner;
             
-            
-
             private Bounds m_Bounds;
 
             public Bounds Bounds => new Bounds(m_Bounds.center, m_Bounds.size);
@@ -69,12 +65,12 @@ namespace ioTerraMap
             /// <returns>Elevated vertices of the mesh</returns>
             public Vector3[] ElevatedVerts()
             {
-                return ElevatedVerts(SitePos);
+                return ElevatedVerts(SitePositions);
             }
             public Vector3[] ElevatedVerts(Vector3[] _sitePoss)
             {
-                var cornZs = new float[CornerPos.Length];
-                for (int cIdx = 0; cIdx < CornerPos.Length; ++cIdx)
+                var cornZs = new float[Vertices.Length];
+                for (int cIdx = 0; cIdx < Vertices.Length; ++cIdx)
                 {
                     var sPoss = new List<Vector3>();
                     foreach (var sIdx in SitesHavingCorner[cIdx])
@@ -87,14 +83,15 @@ namespace ioTerraMap
                     cornZs[cIdx] = sPoss.Average(_sPos => _sPos.z);
                 }
     
-                return cornZs.Select((_z, _idx) => new Vector3(CornerPos[_idx].x, CornerPos[_idx].y, _z)).ToArray();
+                return cornZs.Select((_z, _idx) => new Vector3(Vertices[_idx].x, Vertices[_idx].y, _z)).ToArray();
             }
 
+            
             private TerraMesh() {}
 
-            internal TerraMesh(Vector2[] _cornerPos, int[] _triangles)
+            internal TerraMesh(Vector2[] vertices, int[] _triangles)
             {
-                CornerPos = _cornerPos;
+                Vertices = vertices;
                 Triangles = _triangles;
             }
             
@@ -103,16 +100,12 @@ namespace ioTerraMap
             // TODO ------------------------------------- Here's where I Left OFFFFFFFFF -------------------
             
             
-            
-            
-            
-            
             public static Vector3[] PlanchonDarboux(TerraMesh _tMesh, float _minSlope, Progress.OnUpdate _onUpdate)
             {
 
                 var prog = new Progress("PlanchonDarboux");
                 prog.SetOnUpdate(_onUpdate);
-                var sitePosArr = _tMesh.SitePos;
+                var sitePosArr = _tMesh.SitePositions;
                 var hullSites = _tMesh.HullSites;
                 
                 //Generate waterflow surface points
@@ -154,7 +147,7 @@ namespace ioTerraMap
                         var c = pIdx;
                         if (!(W(c) > Z(c))) continue;
                         var cVertZ = sitePos;
-                        foreach (var n in _tMesh.SiteNbrs[pIdx])
+                        foreach (var n in _tMesh.SiteNeighbors[pIdx])
                         {
                             var e = E(c, n);
                             var wpn = W(n) + e;
@@ -192,9 +185,9 @@ namespace ioTerraMap
                 float minZ = float.PositiveInfinity, 
                     maxZ = float.NegativeInfinity;
                 
-                for (int sIdx = 0; sIdx < SitePos.Length; ++sIdx)
+                for (int sIdx = 0; sIdx < SitePositions.Length; ++sIdx)
                 {
-                    var z = SitePos[sIdx].z;
+                    var z = SitePositions[sIdx].z;
                     if (z < minZ) 
                         minZ = z;
                     if (z > maxZ)
@@ -206,11 +199,11 @@ namespace ioTerraMap
                 var newSpan = _max - _min;
     
     
-                for (int sIdx = 0; sIdx < SitePos.Length; ++sIdx)
+                for (int sIdx = 0; sIdx < SitePositions.Length; ++sIdx)
                 {
-                    var sPos = SitePos[sIdx];
+                    var sPos = SitePositions[sIdx];
                     var zPct = (sPos.z - minZ) / zSpan;
-                    SitePos[sIdx].Set(sPos.x, sPos.y, (zPct * newSpan) + _min);
+                    SitePositions[sIdx].Set(sPos.x, sPos.y, (zPct * newSpan) + _min);
                 }
             }
             
@@ -224,9 +217,9 @@ namespace ioTerraMap
             {
                 _zMin = float.PositiveInfinity;
                 _zMax = float.NegativeInfinity;
-                for (int sIdx = 0; sIdx < SitePos.Length; ++sIdx)
+                for (int sIdx = 0; sIdx < SitePositions.Length; ++sIdx)
                 {
-                    var z = SitePos[sIdx].z;
+                    var z = SitePositions[sIdx].z;
                     if (z < _zMin) 
                         _zMin = z;
                     if (z > _zMax)

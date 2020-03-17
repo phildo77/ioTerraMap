@@ -8,14 +8,13 @@ using scm = System.ComponentModel;
 
 namespace ioTerraMap
 {
-
-
+    [Serializable]
     [StructLayout(LayoutKind.Sequential)]
     public struct Bounds : IEquatable<Bounds>
     {
         private Vector3 m_Center;
         private Vector3 m_Extents;
-        
+
         // Creates new Bounds with a given /center/ and total /size/. Bound ::ref::extents will be half the given size.
         public Bounds(Vector3 center, Vector3 size)
         {
@@ -34,7 +33,7 @@ namespace ioTerraMap
         {
             if (!(other is Bounds)) return false;
 
-            return Equals((Bounds)other);
+            return Equals((Bounds) other);
         }
 
         public bool Equals(Bounds other)
@@ -43,29 +42,47 @@ namespace ioTerraMap
         }
 
         // The center of the bounding box.
-        public Vector3 center { get { return m_Center; } set { m_Center = value; } }
-
-        // The total size of the box. This is always twice as large as the ::ref::extents.
-        public Vector3 size { get { return m_Extents * 2.0F; } set { m_Extents = value * 0.5F; } }
-
-        // The extents of the box. This is always half of the ::ref::size.
-        public Vector3 extents { get { return m_Extents; } set { m_Extents = value; } }
-
-        // The minimal point of the box. This is always equal to ''center-extents''.
-        public Vector3 min { get { return center - extents; } set { SetMinMax(value, max); } }
-
-        // The maximal point of the box. This is always equal to ''center+extents''.
-        public Vector3 max { get { return center + extents; } set { SetMinMax(min, value); } }
-
-        //*undoc*
-        public static bool operator==(Bounds lhs, Bounds rhs)
+        public Vector3 center
         {
-            // Returns false in the presence of NaN values.
-            return (lhs.center == rhs.center && lhs.extents == rhs.extents);
+            get => m_Center;
+            set => m_Center = value;
         }
 
-        //*undoc*
-        public static bool operator!=(Bounds lhs, Bounds rhs)
+        // The total size of the box. This is always twice as large as the ::ref::extents.
+        public Vector3 size
+        {
+            get => m_Extents * 2.0F;
+            set => m_Extents = value * 0.5F;
+        }
+
+        // The extents of the box. This is always half of the ::ref::size.
+        public Vector3 extents
+        {
+            get => m_Extents;
+            set => m_Extents = value;
+        }
+
+        // The minimal point of the box. This is always equal to ''center-extents''.
+        public Vector3 min
+        {
+            get => center - extents;
+            set => SetMinMax(value, max);
+        }
+
+        // The maximal point of the box. This is always equal to ''center+extents''.
+        public Vector3 max
+        {
+            get => center + extents;
+            set => SetMinMax(min, value);
+        }
+
+        public static bool operator ==(Bounds lhs, Bounds rhs)
+        {
+            // Returns false in the presence of NaN values.
+            return lhs.center == rhs.center && lhs.extents == rhs.extents;
+        }
+
+        public static bool operator !=(Bounds lhs, Bounds rhs)
         {
             // Returns true in the presence of NaN values.
             return !(lhs == rhs);
@@ -107,11 +124,9 @@ namespace ioTerraMap
         // Does another bounding box intersect with this bounding box?
         public bool Intersects(Bounds bounds)
         {
-            return (min.x <= bounds.max.x) && (max.x >= bounds.min.x) &&
-                (min.y <= bounds.max.y) && (max.y >= bounds.min.y) &&
-                (min.z <= bounds.max.z) && (max.z >= bounds.min.z);
+            return min.x <= bounds.max.x && max.x >= bounds.min.x &&
+                   min.y <= bounds.max.y && max.y >= bounds.min.y &&
+                   min.z <= bounds.max.z && max.z >= bounds.min.z;
         }
-
-
     }
 }

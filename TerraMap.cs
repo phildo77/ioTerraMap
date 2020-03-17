@@ -1,23 +1,19 @@
+using System;
+
 namespace ioTerraMap
 {
+    [Serializable]
     public partial class TerraMap
     {
-        
         public readonly Settings settings;
-        public TerraMesh TMesh;
+
+        public int[] RiverSites;
         public BiomeStuff TBiome;
+        public TerraMesh TMesh;
         public TerraTexture TTex;
-        
+
         public WaterNode[] WaterFlux;
         public float WaterFluxMax;
-        public float WaterFluxMin => settings.RainfallGlobal;
-        public float WaterFluxSpan => WaterFluxMax - WaterFluxMin;
-        
-        public int[] RiverSites;
-
-        private float m_WaterLevelPct;
-
-        public float WaterSurfaceZ => m_WaterLevelPct; //Pct from Min z to Max z - TODO change to actual Z height?
 
         private TerraMap()
         {
@@ -28,30 +24,28 @@ namespace ioTerraMap
         {
             settings = _settings;
         }
-        
+
+        public float WaterFluxMin => settings.RainfallGlobal;
+        public float WaterFluxSpan => WaterFluxMax - WaterFluxMin;
+
+        public float WaterSurfaceZ { get; private set; }
+
         public Vector3[] GetMeshVertsWaterTop()
         {
             var verts = TMesh.ElevatedVerts();
-            for (int idx = 0; idx < verts.Length; ++idx)
-            {
+            for (var idx = 0; idx < verts.Length; ++idx)
                 if (verts[idx].z < WaterSurfaceZ)
                     verts[idx].Set(verts[idx].x, verts[idx].y, WaterSurfaceZ);
-            }
 
             return verts;
         }
 
-        
-        
-        
+        [Serializable]
         public class WaterNode
         {
-            public int SiteIdx;
-            public WaterNode NodeTo;
             public float Flux;
-
+            public WaterNode NodeTo;
+            public int SiteIdx;
         }
-        
     }
-
 }

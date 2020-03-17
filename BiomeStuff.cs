@@ -1,15 +1,17 @@
+using System;
+
 namespace ioTerraMap
 {
     public partial class TerraMap
     {
-        
+        [Serializable]
         public class BiomeStuff
         {
             
             public Biome[][] BiomeConfig;
             public Biome BiomeWater;
             public int[] SiteBiomeMoistZone;
-            public TerraMap Host;
+            public TerraMap Host;  //TODO lose this?
     
     
             public BiomeStuff(TerraMap _host)
@@ -19,7 +21,7 @@ namespace ioTerraMap
                 SetupBiomes();
                 
                 //TODO Config Biomes on map using units of distance
-                var sitePos = Host.TMesh.SitePos;
+                var sitePos = Host.TMesh.SitePositions;
                 SiteBiomeMoistZone = new int[sitePos.Length];
                 //SiteBiomeElevZone = new int[sitePos.Length];
                 //SiteBiomes = new Biome[sitePos.Length];
@@ -104,6 +106,7 @@ namespace ioTerraMap
     
             }
             
+            [Serializable]
             public class Biome
             {
                 public string Name;

@@ -1,6 +1,8 @@
 ﻿namespace ioTerraMap
 {
 using System;
+  
+  [Serializable]
   public struct Vector3 : IEquatable<Vector3>
   {
     private static readonly Vector3 zeroVector = new Vector3(0.0f, 0.0f, 0.0f);

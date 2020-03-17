@@ -18,6 +18,7 @@ namespace ioTerraMapTest
             var sets = new TerraMap.Settings();
             sets.Resolution = 1;
             sets.Bounds = new Rect(Vector2.one, 256 * Vector2.one);
+            sets.GlobalSlopeDir = Vector2.left;
 
             Progress.OnUpdate progOnUpdate = (_pct, _str) =>
             {

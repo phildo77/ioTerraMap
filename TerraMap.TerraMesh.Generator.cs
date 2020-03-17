@@ -11,8 +11,6 @@ namespace ioTerraMap
         {
             internal class Generator
             {
-
-                
                 internal delegate void OnComplete(TerraMesh _tMesh);
                 
                 internal static void Generate(Settings _settings, Progress.OnUpdate _actProg, OnComplete _onComplete) //TODO rename to _onUpdate
@@ -24,9 +22,9 @@ namespace ioTerraMap
                     prog = new Progress("TerraMesh");
                     prog.SetOnUpdate(actProg);
 
-                    var bnds = _settings.Bounds;
-                    var xSize = bnds.width;
-                    var ySize = bnds.height;
+                    var bounds = _settings.Bounds;
+                    var xSize = bounds.width;
+                    var ySize = bounds.height;
                     var xSpanCount = xSize * _settings.Resolution;
                     var ySpanCount = ySize * _settings.Resolution;
                     int pntCnt = (int)(xSpanCount * ySpanCount);
@@ -38,7 +36,7 @@ namespace ioTerraMap
 
                     for (int pIdx = 0; pIdx < pntCnt; ++pIdx)
                     {
-                        points.Add(Settings.RndVec2(bnds, _settings.m_Rnd));
+                        points.Add(Settings.RndVec2(bounds, _settings.m_Rnd));
                         prog.Update((float) pIdx / pntCnt);
                     }
                         
@@ -49,8 +47,8 @@ namespace ioTerraMap
                     del.Triangulate();
                     var vor = new Voronoi(del);
                     vor.Build();
-                    vor.TrimSitesToBndry(bnds);
-                    vor.LloydRelax(bnds);
+                    vor.TrimSitesToBndry(bounds);
+                    vor.LloydRelax(bounds);
         
                     //Index Delaunay triangles
                     prog.Update(0, "Indexing Tris");
@@ -74,10 +72,10 @@ namespace ioTerraMap
                     triScan = del.LastTri;
                     
                     var tMesh = new TerraMesh(del.Mesh.Vertices, delTriangles);
-                    tMesh.SitePos = new Vector3[tsCnt];
-                    tMesh.SiteCrns = new int[tsCnt][];
-                    tMesh.SiteNbrs = new int[tsCnt][];
-                    tMesh.SitesHavingCorner = new HashSet<int>[tMesh.CornerPos.Length];
+                    tMesh.SitePositions = new Vector3[tsCnt];
+                    tMesh.SiteCorners = new int[tsCnt][];
+                    tMesh.SiteNeighbors = new int[tsCnt][];
+                    tMesh.SitesHavingCorner = new HashSet<int>[tMesh.Vertices.Length];
                     prog.Update(0, "Filling Neighbors");
                     while (triScan != null)
                     {
@@ -89,9 +87,9 @@ namespace ioTerraMap
                             triScan.Edge2.OriginPos
                         };
                         var tCent = Geom.CentroidOfPoly(triVertPoss); //Use centroid instead of CircCent
-                        tMesh.SitePos[tIdx] = new Vector3(tCent.x, tCent.y, 0.5f);
-                        tMesh.SiteCrns[tIdx] = new int[3];
-                        tMesh.SiteNbrs[tIdx] = new int[3];
+                        tMesh.SitePositions[tIdx] = new Vector3(tCent.x, tCent.y, 0.5f);
+                        tMesh.SiteCorners[tIdx] = new int[3];
+                        tMesh.SiteNeighbors[tIdx] = new int[3];
                         //Record neighbors
                         var edges = new[] {triScan.Edge0, triScan.Edge1, triScan.Edge2};
                         for(int eIdx = 0; eIdx < 3; ++eIdx)
@@ -101,12 +99,12 @@ namespace ioTerraMap
                             if(tMesh.SitesHavingCorner[oIdx] == null)
                                 tMesh.SitesHavingCorner[oIdx] = new HashSet<int>();
                             tMesh.SitesHavingCorner[oIdx].Add(tIdx);
-                            tMesh.SiteCrns[tIdx][eIdx] = oIdx;
+                            tMesh.SiteCorners[tIdx][eIdx] = oIdx;
                             
                             if (edge.Twin != null)
-                                tMesh.SiteNbrs[tIdx][eIdx] = triRef[edge.Twin.Triangle];
+                                tMesh.SiteNeighbors[tIdx][eIdx] = triRef[edge.Twin.Triangle];
                             else
-                                tMesh.SiteNbrs[tIdx][eIdx] = SITE_IDX_NULL;
+                                tMesh.SiteNeighbors[tIdx][eIdx] = SiteIdxNull;
                         }
                         triScan = triScan.PrevTri;
                         prog.Update((float) tsCnt / tMesh.Triangles.Length);
@@ -130,11 +128,11 @@ namespace ioTerraMap
 
                     
                     //UV
-                    tMesh.UV = new Vector2[tMesh.CornerPos.Length];
+                    tMesh.UV = new Vector2[tMesh.Vertices.Length];
                     var relOS = new Vector2(tMesh.m_Bounds.min.x, tMesh.m_Bounds.min.y);
-                    for (int pIdx = 0; pIdx < tMesh.CornerPos.Length; ++pIdx)
+                    for (int pIdx = 0; pIdx < tMesh.Vertices.Length; ++pIdx)
                     {
-                        var relPos = tMesh.CornerPos[pIdx] - relOS;
+                        var relPos = tMesh.Vertices[pIdx] - relOS;
                         var uvPos = new Vector2(relPos.x / tMesh.m_Bounds.size.x, relPos.y / tMesh.m_Bounds.size.y);
                         tMesh.UV[pIdx] = uvPos;
                     }
@@ -156,9 +154,9 @@ namespace ioTerraMap
 
                 public static void Blob(TerraMesh _tMesh, float _strength, float _radius, Vector2 _loc)
                 {
-                    for (int sIdx = 0; sIdx < _tMesh.SitePos.Length; ++sIdx)
+                    for (int sIdx = 0; sIdx < _tMesh.SitePositions.Length; ++sIdx)
                     {
-                        var sPos = _tMesh.SitePos[sIdx];
+                        var sPos = _tMesh.SitePositions[sIdx];
                         var vert2d = _tMesh.ToVec2(sPos);
                         var dist = (vert2d - _loc).magnitude;
                         if (dist > _radius) continue;
@@ -167,7 +165,7 @@ namespace ioTerraMap
                         var newZ = sPos.z + zShift;
                         var newPos = new Vector3(vert2d.x, vert2d.y, sPos.z + zShift);
                         _tMesh.m_Bounds.Encapsulate(newPos);
-                        _tMesh.SitePos[sIdx] = newPos;
+                        _tMesh.SitePositions[sIdx] = newPos;
                     }
                 }
                 
@@ -191,17 +189,17 @@ namespace ioTerraMap
                     };
     
                     prog.Update(0,"Global Slope");
-                    for (int sIdx = 0; sIdx < _tMesh.SitePos.Length; ++sIdx)
+                    for (int sIdx = 0; sIdx < _tMesh.SitePositions.Length; ++sIdx)
                     {
                         //if (_tMesh.HullSites.Contains(sIdx))
                         //    Trace.WriteLine("Debug Hullsites"); //TODO DEbug
-                        var sitePos = _tMesh.SitePos[sIdx];
+                        var sitePos = _tMesh.SitePositions[sIdx];
                         var zShift = strf(sitePos);
                         var newZ = sitePos.z + zShift;
                         var newPos = new Vector3(sitePos.x, sitePos.y, newZ);
-                        _tMesh.SitePos[sIdx] = newPos;
+                        _tMesh.SitePositions[sIdx] = newPos;
                         _tMesh.m_Bounds.Encapsulate(newPos);
-                        prog.Update((float) sIdx / _tMesh.SitePos.Length);
+                        prog.Update((float) sIdx / _tMesh.SitePositions.Length);
                     }
                 }
                 
@@ -217,22 +215,22 @@ namespace ioTerraMap
                     var maxMag = (min - cent).magnitude;
                 
                     prog.Update(0, "Conifying");
-                    for (int sIdx = 0; sIdx < _tMesh.SitePos.Length; ++sIdx)
+                    for (int sIdx = 0; sIdx < _tMesh.SitePositions.Length; ++sIdx)
                     {
-                        var sitePos = _tMesh.SitePos[sIdx];
+                        var sitePos = _tMesh.SitePositions[sIdx];
                         var magScal = (new Vector2(sitePos.x, sitePos.y)  - cent).magnitude / maxMag - 0.5f;
                         var zShift = magScal * _strength / 2f;
                         var newPos = new Vector3(sitePos.x, sitePos.y, zShift + sitePos.z);
-                        _tMesh.SitePos[sIdx] = newPos;
+                        _tMesh.SitePositions[sIdx] = newPos;
                         _tMesh.m_Bounds.Encapsulate(newPos);
-                        prog.Update((float) sIdx / _tMesh.SitePos.Length);
+                        prog.Update((float) sIdx / _tMesh.SitePositions.Length);
                     }
                 }
                 
                 public static void Erode(TerraMesh _tMesh, float _maxErosionRate, float[] _waterFlux)
                 {
 
-                    var meshSurf = _tMesh.SitePos;
+                    var meshSurf = _tMesh.SitePositions;
                     
                     //Get all site slope vectors and slope values
                     var slopeVecs = new Vector3[meshSurf.Length];
@@ -243,9 +241,9 @@ namespace ioTerraMap
                         var p = meshSurf[pIdx];
                         var aveSlp = Vector3.zero;
                         var nbrCnt = 0;
-                        foreach (var nIdx in _tMesh.SiteNbrs[pIdx])
+                        foreach (var nIdx in _tMesh.SiteNeighbors[pIdx])
                         {
-                            if (nIdx == SITE_IDX_NULL) continue;
+                            if (nIdx == SiteIdxNull) continue;
                             nbrCnt++;
                             var n = meshSurf[nIdx];
                             var slpVec = n - p;
@@ -260,15 +258,15 @@ namespace ioTerraMap
                     }
                     
                     //Apply erosion to terra mesh surface
-                    for (int pIdx = 0; pIdx < _tMesh.SitePos.Length; ++pIdx)
+                    for (int pIdx = 0; pIdx < _tMesh.SitePositions.Length; ++pIdx)
                     {
-                        var sitePos = _tMesh.SitePos[pIdx];
+                        var sitePos = _tMesh.SitePositions[pIdx];
                         var fx = (float)Math.Sqrt(_waterFlux[pIdx]);
                         var slp = slopeVals[pIdx];
                         var erosionShift = (float)Math.Min(-slp * fx, _maxErosionRate);
                         var newPos = new Vector3(sitePos.x, sitePos.y, sitePos.z - erosionShift);
                         _tMesh.m_Bounds.Encapsulate(newPos);
-                        _tMesh.SitePos[pIdx] = newPos;
+                        _tMesh.SitePositions[pIdx] = newPos;
                     }
                 
                 }
@@ -278,7 +276,7 @@ namespace ioTerraMap
             public static void Slice(TerraMesh _tMesh, int _maxVertCount, out int[][] _triIdxs)
             {
                 //Check if already meet max vert count
-                if (_tMesh.CornerPos.Length <= _maxVertCount)
+                if (_tMesh.Vertices.Length <= _maxVertCount)
                 {
                     _triIdxs = new int[1][];
                     _triIdxs[0] = _tMesh.Triangles;
@@ -303,9 +301,9 @@ namespace ioTerraMap
                     var vertsPerBox = new int[boxCnt];
                     vIdxToMIdx = new Dictionary<int, int>();
 
-                    for (int vIdx = 0; vIdx < _tMesh.CornerPos.Length; ++vIdx)
+                    for (int vIdx = 0; vIdx < _tMesh.Vertices.Length; ++vIdx)
                     {
-                        var curVert = _tMesh.CornerPos[vIdx];
+                        var curVert = _tMesh.Vertices[vIdx];
                         
                         //Find Col
                         for (int xScanIdx = 1; xScanIdx <= rowCnt; ++xScanIdx)
