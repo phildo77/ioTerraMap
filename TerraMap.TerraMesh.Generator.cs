@@ -12,14 +12,13 @@ namespace ioTerraMap
             internal class Generator
             {
                 internal delegate void OnComplete(TerraMesh _tMesh);
-                
+
                 internal static void Generate(Settings _settings, Progress.OnUpdate _actProg, OnComplete _onComplete) //TODO rename to _onUpdate
                 {
-                    var prog = new Progress();
                     var actProg = _actProg ?? ((_progPct, _progStr) => { });
                     
                     
-                    prog = new Progress("TerraMesh");
+                    var prog = new Progress("TerraMesh");
                     prog.SetOnUpdate(actProg);
 
                     var bounds = _settings.Bounds;
@@ -126,16 +125,6 @@ namespace ioTerraMap
                     var bndSize = new Vector3(del.BoundsRect.width, del.BoundsRect.height);
                     tMesh.m_Bounds = new Bounds(bndCent, bndSize);
 
-                    
-                    //UV
-                    tMesh.UV = new Vector2[tMesh.Vertices.Length];
-                    var relOS = new Vector2(tMesh.m_Bounds.min.x, tMesh.m_Bounds.min.y);
-                    for (int pIdx = 0; pIdx < tMesh.Vertices.Length; ++pIdx)
-                    {
-                        var relPos = tMesh.Vertices[pIdx] - relOS;
-                        var uvPos = new Vector2(relPos.x / tMesh.m_Bounds.size.x, relPos.y / tMesh.m_Bounds.size.y);
-                        tMesh.UV[pIdx] = uvPos;
-                    }
                     //Done
                     _onComplete(tMesh);
                 }
