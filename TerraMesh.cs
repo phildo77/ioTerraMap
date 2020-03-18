@@ -57,11 +57,13 @@ namespace ioTerraMap
             {
             }
 
-            internal TerraMesh(Vector2[] vertices, int[] _triangles)
+            private TerraMesh(Vector2[] vertices, int[] _triangles)
             {
                 Vertices = vertices;
                 Triangles = _triangles;
             }
+
+            
 
             public Bounds Bounds => new Bounds(m_Bounds.center, m_Bounds.size);
 

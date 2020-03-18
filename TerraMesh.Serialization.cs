@@ -1,5 +1,4 @@
-using System;
-using System.IO;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using ioDelaunay;
 
@@ -9,92 +8,101 @@ namespace ioTerraMap
     {
         public partial class TerraMesh
         {
-            public byte[] Serialize()
+            public static byte[] Serialize(TerraMesh _terraMesh)
             {
-                var sb = new SerializedBundle(this);
+                var sb = new SerializedBundle(_terraMesh);
                 return sb.SerializedData;
             }
-            
+
+            public static TerraMesh Deserialize(byte[] _serializedData)
+            {
+                var sb = new SerializedBundle(_serializedData);
+                var tm = new TerraMesh(sb.Vertices, sb.Triangles);
+                tm.HullSites = sb.HullSites;
+                tm.SiteCorners = sb.SiteCorners;
+                tm.SiteNeighbors = sb.SiteNeighbors;
+                tm.SitePositions = sb.SitePositions;
+                tm.SitesHavingCorner = sb.SitesHavingCorner;
+                return tm;
+            }
+
             private class SerializedBundle
             {
-                private TerraMesh TM;
-                private readonly int VertexCount;
-                private readonly int TriangleCount;
-                private readonly int HullSitesCount;
-                private readonly int SiteCornersCount;
-                private readonly int SiteNeighborsCount;
-                private readonly int SitePositionsCount;
-                private readonly int SitesHavingCornerCount;
-                private readonly int[] SitesHavingCornerSetCount;
+                private const int CUR_VERSION = 1;
+                public readonly int[] HullSites;
+                public readonly int[][] SiteCorners;
+                public readonly int[][] SiteNeighbors;
+                public readonly Vector3[] SitePositions;
+                public readonly HashSet<int>[] SitesHavingCorner;
+                public readonly int[] Triangles;
 
-                private byte[] DataBuffer;
+                public readonly int Version;
+                public readonly Vector2[] Vertices;
                 private int BufIdx;
 
                 private Byte32 byte32;
                 private ByteVector2 bytesVec2;
                 private ByteVector3 bytesVec3;
-                
-                public byte[] SerializedData => DataBuffer;
-                
+
+                private readonly byte[] DataBuffer;
+
                 public SerializedBundle(TerraMesh _tm)
                 {
-                    TM = _tm;
+                    Version = CUR_VERSION;
+
                     //Vector2 -- 8 bytes
-                    VertexCount = _tm.Vertices.Length;
+                    Vertices = _tm.Vertices;
                     //int - 4 bytes
-                    TriangleCount = _tm.Triangles.Length;
+                    Triangles = _tm.Triangles;
                     //int - 4 bytes
-                    HullSitesCount = _tm.HullSites.Length;
+                    HullSites = _tm.HullSites;
                     //3 ints - 12 bytes
-                    SiteCornersCount = _tm.SiteCorners.Length;
+                    SiteCorners = _tm.SiteCorners;
                     //3 ints - 12 bytes
-                    SiteNeighborsCount = _tm.SiteNeighbors.Length;
+                    SiteNeighbors = _tm.SiteNeighbors;
                     //Vector3 -- 12 bytes
-                    SitePositionsCount = _tm.SitePositions.Length;
+                    SitePositions = _tm.SitePositions;
                     //Variable -- need to track length for each set
-                    SitesHavingCornerCount = _tm.SitesHavingCorner.Length;
-                    SitesHavingCornerSetCount = new int[_tm.SitesHavingCorner.Length];
+                    SitesHavingCorner = _tm.SitesHavingCorner;
 
                     var totalSetCount = 0;
-                    for (int cornerIdx = 0; cornerIdx < SitesHavingCornerCount; ++cornerIdx)
-                    {
-                        var setCount = _tm.SitesHavingCorner[cornerIdx].Count;
-                        SitesHavingCornerSetCount[cornerIdx] = setCount;
-                        totalSetCount += setCount;
-                    }
+                    for (var cornerIdx = 0; cornerIdx < SitesHavingCorner.Length; ++cornerIdx)
+                        totalSetCount += _tm.SitesHavingCorner[cornerIdx].Count;
 
                     var dataLen = sizeof(int); //Total size header
+                    dataLen = sizeof(int); // Version
                     dataLen += sizeof(int); // Vertex count header
-                    dataLen += VertexCount * sizeof(float) * 2; // Vector2
+                    dataLen += Vertices.Length * sizeof(float) * 2; // Vector2
                     dataLen += sizeof(int); // Triangle count header
-                    dataLen += TriangleCount * sizeof(int); //int
+                    dataLen += Triangles.Length * sizeof(int); //int
                     dataLen += sizeof(int); // HullSites count header
-                    dataLen += HullSitesCount * sizeof(int); //int
+                    dataLen += HullSites.Length * sizeof(int); //int
                     dataLen += sizeof(int); // SiteCorners count header
-                    dataLen += SiteCornersCount * sizeof(int) * 3;//int * 3
+                    dataLen += SiteCorners.Length * sizeof(int) * 3; //int * 3
                     dataLen += sizeof(int); // SiteNeighbors count header
-                    dataLen += SiteNeighborsCount * sizeof(int) * 3; // int * 3
+                    dataLen += SiteNeighbors.Length * sizeof(int) * 3; // int * 3
                     dataLen += sizeof(int); // SitePositions count header
-                    dataLen += SitePositionsCount * sizeof(float) * 3; // Vector3
+                    dataLen += SitePositions.Length * sizeof(float) * 3; // Vector3
                     dataLen += sizeof(int); // Site having corner set count
-                    dataLen += SitesHavingCornerCount * sizeof(int); //Site Having corner count headers
+                    dataLen += SitesHavingCorner.Length * sizeof(int); //Site Having corner count headers
                     dataLen += totalSetCount * sizeof(int); //Sites having corner set indexes
 
                     DataBuffer = new byte[dataLen];
                     BufIdx = 0;
-                    
+
                     byte32 = new Byte32();
                     bytesVec2 = new ByteVector2();
                     bytesVec3 = new ByteVector3();
-                    
-                    SerializeVertices(ref BufIdx, ref DataBuffer);
-                    SerializeTris(ref BufIdx, ref DataBuffer);
-                    SerializeHullSites(ref BufIdx, ref DataBuffer);
-                    SerializeSiteCorners(ref BufIdx, ref DataBuffer);
-                    SerializeSiteNeighbors(ref BufIdx, ref DataBuffer);
-                    SerializeSitePositions(ref BufIdx, ref DataBuffer);
-                    SerializeSitesHavingCorner(ref BufIdx, ref DataBuffer);
 
+                    byte32.Write(DataBuffer, ref BufIdx, dataLen);
+                    
+                    SerializeVertices(ref BufIdx, DataBuffer);
+                    SerializeTris(ref BufIdx, DataBuffer);
+                    SerializeHullSites(ref BufIdx, DataBuffer);
+                    SerializeSiteCorners(ref BufIdx, DataBuffer);
+                    SerializeSiteNeighbors(ref BufIdx, DataBuffer);
+                    SerializeSitePositions(ref BufIdx, DataBuffer);
+                    SerializeSitesHavingCorner(ref BufIdx, DataBuffer);
                 }
 
                 public SerializedBundle(byte[] _data)
@@ -105,84 +113,176 @@ namespace ioTerraMap
                     DataBuffer = _data;
                     BufIdx = 0;
 
-                    var totalLen = byte32.Read(ref DataBuffer, ref BufIdx);
-                    VertexCount = byte32.Read(ref DataBuffer, ref BufIdx);
-                    //TODO Working on Deserialization code here
+                    byte32.Read(DataBuffer, ref BufIdx);
+                    var totalLen = byte32.integer;
+
+                    var version = byte32.ReadInt(DataBuffer, ref BufIdx);
+
+                    var vertexCount = byte32.ReadInt(DataBuffer, ref BufIdx);
+                    Vertices = DeserializeVectors(vertexCount);
+
+                    var triangleCount = byte32.ReadInt(DataBuffer, ref BufIdx);
+                    Triangles = DeserializeTris(triangleCount);
+
+                    var hullSitesCount = byte32.ReadInt(DataBuffer, ref BufIdx);
+                    HullSites = DeserializeHullSites(hullSitesCount);
+
+                    var siteCornerCount = byte32.ReadInt(DataBuffer, ref BufIdx);
+                    SiteCorners = DeserializeSiteCorners(siteCornerCount);
+
+                    var siteNeighborsCount = byte32.ReadInt(DataBuffer, ref BufIdx);
+                    SiteNeighbors = DeserializeSiteNeighbors(siteNeighborsCount);
+
+                    var sitePositionsCount = byte32.ReadInt(DataBuffer, ref BufIdx);
+                    SitePositions = DeserializeSitePositions(sitePositionsCount);
+
+                    var sitesHavingCornerCount = byte32.ReadInt(DataBuffer, ref BufIdx);
+                    SitesHavingCorner = DeserializeSitesHavingCorner(sitesHavingCornerCount);
                 }
 
+                public byte[] SerializedData => DataBuffer;
 
-
-                private void SerializeVertices(ref int _index, ref byte[] _data)
+                private Vector2[] DeserializeVectors(int _count)
                 {
-                    byte32.Write(ref _data, ref _index, VertexCount);
-                    for (int vIdx = 0; vIdx < VertexCount; ++vIdx)
+                    var vertices = new Vector2[_count];
+                    for (var vIdx = 0; vIdx < _count; ++vIdx)
+                        vertices[vIdx] = bytesVec2.Read(DataBuffer, ref BufIdx);
+                    return vertices;
+                }
+
+                private int[] DeserializeTris(int _count)
+                {
+                    var tris = new int[_count];
+                    for (var tIdx = 0; tIdx < _count; ++tIdx)
+                        tris[tIdx] = byte32.ReadInt(DataBuffer, ref BufIdx);
+                    return tris;
+                }
+
+                private int[] DeserializeHullSites(int _count)
+                {
+                    var hullSites = new int[_count];
+                    for (var hsIdx = 0; hsIdx < _count; ++hsIdx)
+                        hullSites[hsIdx] = byte32.ReadInt(DataBuffer, ref BufIdx);
+                    return hullSites;
+                }
+
+                private int[][] DeserializeSiteCorners(int _count)
+                {
+                    var siteCorners = new int[_count][];
+                    for (var scIdx = 0; scIdx < _count; ++scIdx)
                     {
-                        bytesVec2.SetBytes(TM.Vertices[vIdx]);
-                        bytesVec2.Write(ref _data, ref _index);
+                        siteCorners[scIdx] = new int[3];
+                        siteCorners[scIdx][0] = byte32.ReadInt(DataBuffer, ref BufIdx);
+                        siteCorners[scIdx][1] = byte32.ReadInt(DataBuffer, ref BufIdx);
+                        siteCorners[scIdx][2] = byte32.ReadInt(DataBuffer, ref BufIdx);
+                    }
+
+                    return siteCorners;
+                }
+
+                private int[][] DeserializeSiteNeighbors(int _count)
+                {
+                    var siteNeighbors = new int[_count][];
+                    for (var snIdx = 0; snIdx < _count; ++snIdx)
+                    {
+                        siteNeighbors[snIdx] = new int[3];
+                        siteNeighbors[snIdx][0] = byte32.ReadInt(DataBuffer, ref BufIdx);
+                        siteNeighbors[snIdx][1] = byte32.ReadInt(DataBuffer, ref BufIdx);
+                        siteNeighbors[snIdx][2] = byte32.ReadInt(DataBuffer, ref BufIdx);
+                    }
+
+                    return siteNeighbors;
+                }
+
+                private Vector3[] DeserializeSitePositions(int _count)
+                {
+                    var sitePositions = new Vector3[_count];
+                    for (var spIdx = 0; spIdx < _count; ++spIdx)
+                        sitePositions[spIdx] = bytesVec3.Read(DataBuffer, ref BufIdx);
+                    return sitePositions;
+                }
+
+                private HashSet<int>[] DeserializeSitesHavingCorner(int _count)
+                {
+                    var sitesHavingCorner = new HashSet<int>[_count];
+                    for (var shcIdx = 0; shcIdx < _count; ++shcIdx)
+                    {
+                        var siteCount = byte32.ReadInt(DataBuffer, ref BufIdx);
+                        sitesHavingCorner[shcIdx] = new HashSet<int>();
+                        for (var setIdx = 0; setIdx < siteCount; ++setIdx)
+                            sitesHavingCorner[shcIdx].Add(byte32.ReadInt(DataBuffer, ref BufIdx));
+                    }
+
+                    return sitesHavingCorner;
+                }
+
+                private void SerializeVertices(ref int _index, byte[] _data)
+                {
+                    byte32.Write(_data, ref _index, Vertices.Length);
+                    for (var vIdx = 0; vIdx < Vertices.Length; ++vIdx)
+                    {
+                        bytesVec2.SetBytes(Vertices[vIdx]);
+                        bytesVec2.Write(_data, ref _index);
                     }
                 }
-                private void SerializeTris(ref int _index, ref byte[] _data)
+
+                private void SerializeTris(ref int _index, byte[] _data)
                 {
-                    byte32.Write(ref _data, ref _index, TriangleCount);
-                    for (int tIdx = 0; tIdx < TriangleCount; ++tIdx)
-                        byte32.Write(ref _data, ref _index, TM.Triangles[tIdx]);
+                    byte32.Write(_data, ref _index, Triangles.Length);
+                    for (var tIdx = 0; tIdx < Triangles.Length; ++tIdx)
+                        byte32.Write(_data, ref _index, Triangles[tIdx]);
                 }
 
-                private void SerializeHullSites(ref int _index, ref byte[] _data)
+                private void SerializeHullSites(ref int _index, byte[] _data)
                 {
-                    byte32.Write(ref _data, ref _index, HullSitesCount);
-                    for (int hsIdx = 0; hsIdx < HullSitesCount; ++hsIdx)
-                        byte32.Write(ref _data, ref _index, TM.HullSites[hsIdx]);
+                    byte32.Write(_data, ref _index, HullSites.Length);
+                    for (var hsIdx = 0; hsIdx < HullSites.Length; ++hsIdx)
+                        byte32.Write(_data, ref _index, HullSites[hsIdx]);
                 }
 
-                private void SerializeSiteCorners(ref int _index, ref byte[] _data)
+                private void SerializeSiteCorners(ref int _index, byte[] _data)
                 {
-                    byte32.Write(ref _data, ref _index, SiteCornersCount);
-                    for (int scIdx = 0; scIdx < SiteCornersCount; ++scIdx)
+                    byte32.Write(_data, ref _index, SiteCorners.Length);
+                    for (var scIdx = 0; scIdx < SiteCorners.Length; ++scIdx)
                     {
-                        byte32.Write(ref _data, ref _index, TM.SiteCorners[scIdx][0]);
-                        byte32.Write(ref _data, ref _index, TM.SiteCorners[scIdx][1]);
-                        byte32.Write(ref _data, ref _index, TM.SiteCorners[scIdx][2]);
+                        byte32.Write(_data, ref _index, SiteCorners[scIdx][0]);
+                        byte32.Write(_data, ref _index, SiteCorners[scIdx][1]);
+                        byte32.Write(_data, ref _index, SiteCorners[scIdx][2]);
                     }
                 }
 
-                private void SerializeSiteNeighbors(ref int _index, ref byte[] _data)
+                private void SerializeSiteNeighbors(ref int _index, byte[] _data)
                 {
                     //Write Site Neighbors count and data
-                    byte32.Write(ref _data, ref _index, SiteNeighborsCount);
-                    for (int snIdx = 0; snIdx < SiteNeighborsCount; ++snIdx)
+                    byte32.Write(_data, ref _index, SiteNeighbors.Length);
+                    for (var snIdx = 0; snIdx < SiteNeighbors.Length; ++snIdx)
                     {
-                        byte32.Write(ref _data, ref _index, TM.SiteNeighbors[snIdx][0]);
-                        byte32.Write(ref _data, ref _index, TM.SiteNeighbors[snIdx][1]);
-                        byte32.Write(ref _data, ref _index, TM.SiteNeighbors[snIdx][2]);
+                        byte32.Write(_data, ref _index, SiteNeighbors[snIdx][0]);
+                        byte32.Write(_data, ref _index, SiteNeighbors[snIdx][1]);
+                        byte32.Write(_data, ref _index, SiteNeighbors[snIdx][2]);
                     }
                 }
 
-                private void SerializeSitePositions(ref int _index, ref byte[] _data)
+                private void SerializeSitePositions(ref int _index, byte[] _data)
                 {
-                    byte32.Write(ref _data, ref _index, SitePositionsCount);
-                    for (int spIdx = 0; spIdx < SitePositionsCount; ++spIdx)
+                    byte32.Write(_data, ref _index, SitePositions.Length);
+                    for (var spIdx = 0; spIdx < SitePositions.Length; ++spIdx)
                     {
-                        bytesVec3.SetBytes(TM.SitePositions[spIdx]);
-                        bytesVec3.Write(ref _data, ref _index);
+                        bytesVec3.SetBytes(SitePositions[spIdx]);
+                        bytesVec3.Write(_data, ref _index);
                     }
                 }
 
-                private void SerializeSitesHavingCorner(ref int _index, ref byte[] _data)
+                private void SerializeSitesHavingCorner(ref int _index, byte[] _data)
                 {
-                    byte32.Write(ref _data, ref _index, SitesHavingCornerCount);
-                    for (int shcIdx = 0; shcIdx < SitesHavingCornerCount; ++shcIdx)
+                    byte32.Write(_data, ref _index, SitesHavingCorner.Length);
+                    for (var shcIdx = 0; shcIdx < SitesHavingCorner.Length; ++shcIdx)
                     {
-                        byte32.Write(ref _data, ref _index, SitesHavingCornerSetCount[shcIdx]);
-                        foreach (var siteIdx in TM.SitesHavingCorner[shcIdx])
-                        {
-                            byte32.Write(ref _data, ref _index, siteIdx);
-                        }
+                        byte32.Write(_data, ref _index, SitesHavingCorner[shcIdx].Count);
+                        foreach (var siteIdx in SitesHavingCorner[shcIdx]) byte32.Write(_data, ref _index, siteIdx);
                     }
                 }
-                
 
-                
 
                 [StructLayout(LayoutKind.Explicit)]
                 private struct Byte32
@@ -193,38 +293,50 @@ namespace ioTerraMap
                     [FieldOffset(3)] public byte byte3;
 
                     [FieldOffset(0)] public int integer;
-                    [FieldOffset(0)] public uint uInteger;
+                    [FieldOffset(0)] public readonly uint uInteger;
                     [FieldOffset(0)] public float single;
 
-                    public void Write(ref byte[] _buffer, ref int _curIdx, int _value)
+                    public void Write(byte[] _buffer, ref int _curIdx, int _value)
                     {
                         integer = _value;
-                        _buffer[_curIdx++] = byte0;
-                        _buffer[_curIdx++] = byte1;
-                        _buffer[_curIdx++] = byte2;
-                        _buffer[_curIdx++] = byte3;
-                        _curIdx += 4;
+                        Write(_buffer, ref _curIdx);
                     }
-                    
-                    public void Write(ref byte[] _buffer, ref int _curIdx, float _value)
+
+                    public void Write(byte[] _buffer, ref int _curIdx, float _value)
                     {
                         single = _value;
+                        Write(_buffer, ref _curIdx);
+                    }
+
+                    public void Write(byte[] _buffer, ref int _curIdx)
+                    {
                         _buffer[_curIdx++] = byte0;
                         _buffer[_curIdx++] = byte1;
                         _buffer[_curIdx++] = byte2;
                         _buffer[_curIdx++] = byte3;
                     }
 
-                    public int Read(ref byte[] _buffer, ref int _curIdx)
+                    public void Read(byte[] _buffer, ref int _curIdx)
                     {
                         byte0 = _buffer[_curIdx++];
                         byte1 = _buffer[_curIdx++];
                         byte2 = _buffer[_curIdx++];
                         byte3 = _buffer[_curIdx++];
+                    }
+
+                    public int ReadInt(byte[] _buffer, ref int _curIdx)
+                    {
+                        Read(_buffer, ref _curIdx);
                         return integer;
                     }
+
+                    public float ReadFloat(byte[] _buffer, ref int _curIdx)
+                    {
+                        Read(_buffer, ref _curIdx);
+                        return single;
+                    }
                 }
-                
+
                 [StructLayout(LayoutKind.Explicit)]
                 private struct ByteVector3
                 {
@@ -242,15 +354,23 @@ namespace ioTerraMap
                         y = _vector.y;
                         z = _vector.z;
                     }
-                    
-                    public void Write(ref byte[] _buffer, ref int _curIdx)
+
+                    public void Write(byte[] _buffer, ref int _curIdx)
                     {
-                        xData.Write(ref _buffer, ref _curIdx, x);
-                        yData.Write(ref _buffer, ref _curIdx, y);
-                        zData.Write(ref _buffer, ref _curIdx, z);
+                        xData.Write(_buffer, ref _curIdx, x);
+                        yData.Write(_buffer, ref _curIdx, y);
+                        zData.Write(_buffer, ref _curIdx, z);
+                    }
+
+                    public Vector3 Read(byte[] _buffer, ref int _curIdx)
+                    {
+                        xData.Read(_buffer, ref _curIdx);
+                        yData.Read(_buffer, ref _curIdx);
+                        zData.Read(_buffer, ref _curIdx);
+                        return new Vector3(x, y, z);
                     }
                 }
-                
+
                 [StructLayout(LayoutKind.Explicit)]
                 private struct ByteVector2
                 {
@@ -265,21 +385,21 @@ namespace ioTerraMap
                         x = _vector.x;
                         y = _vector.y;
                     }
-                    
-                    public void Write(ref byte[] _buffer, ref int _curIdx)
+
+                    public void Write(byte[] _buffer, ref int _curIdx)
                     {
-                        xData.Write(ref _buffer, ref _curIdx, x);
-                        yData.Write(ref _buffer, ref _curIdx, y);
+                        xData.Write(_buffer, ref _curIdx, x);
+                        yData.Write(_buffer, ref _curIdx, y);
+                    }
+
+                    public Vector2 Read(byte[] _buffer, ref int _curIdx)
+                    {
+                        xData.Read(_buffer, ref _curIdx);
+                        yData.Read(_buffer, ref _curIdx);
+                        return new Vector2(x, y);
                     }
                 }
-                
-                
-
-                
             }
-
-
         }
     }
-
 }

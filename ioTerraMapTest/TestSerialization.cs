@@ -45,18 +45,10 @@ namespace ioTerraMapTest
             Assert.True(true);
         }
 
-        [Test]
-        public void SerializeTerraMap()
+       [Test]
+        public void TestSerializationTerraMesh()
         {
-            var fullFileName = FilePath + "\\TerraMap" + FileName;
-            if (File.Exists(fullFileName))
-                File.Delete(fullFileName);
-
-            Trace.WriteLine("Creating settings file at " + fullFileName);
-
-
-            
-
+            var fullFileName = FilePath + "\\TerraMesh" + FileName;
             
             var resolution = 1f;
             var sets = new TerraMap.Settings();
@@ -87,86 +79,17 @@ namespace ioTerraMapTest
             }
 
             var mapExists = finishedMap != null;
-            
-            // Persist to file
-            var stream = File.Create(fullFileName);
-            var formatter = new BinaryFormatter();
-            Trace.WriteLine("Serializing TerraMap");
-            formatter.Serialize(stream, finishedMap);
-            stream.Close();
-            
-            
-            
-            // Restore from file
-            stream = File.OpenRead(fullFileName);
-            Trace.WriteLine("Deserializing TerraMap");
-            var v = (TerraMap) formatter.Deserialize(stream);
-            stream.Close();
 
+            var tMeshOrig = finishedMap.TMesh;
+            var serializedTMesh = TerraMap.TerraMesh.Serialize(tMeshOrig);
 
-            Assert.True(mapExists);
-        }
+            File.WriteAllBytes(fullFileName, serializedTMesh);
 
-        [Test]
-        public void TestSerializeVectorArray()
-        {
-            Vector3[] array = new Vector3[]
-            {
-                Vector3.up,
-                Vector3.right,
-                Vector3.down,
-                Vector3.left,
-                Vector3.back,
-                Vector3.forward,
-                Vector3.zero
-            };
-            byte[][] byteArray = new byte[array.Length][];
+            var dataFromFile = File.ReadAllBytes(fullFileName);
 
-
-            
-            var fullFileName = FilePath + "\\VectorArray" + FileName;
-            if (File.Exists(fullFileName)) 
-                File.Delete(fullFileName);
-            Trace.WriteLine("Writing Vector array to file: " + fullFileName);
-            using (MemoryStream ms = new MemoryStream())
-            {
-                for (int vecIdx = 0; vecIdx < array.Length; ++vecIdx)
-                {
-                    var curVec = array[vecIdx];
-                    ms.Write(BitConverter.GetBytes(curVec.x), 0, sizeof(float));
-                    ms.Write(BitConverter.GetBytes(curVec.y), 0, sizeof(float));
-                    ms.Write(BitConverter.GetBytes(curVec.z), 0, sizeof(float));
-                }
-                
-                
-                using(FileStream fs = new FileStream(fullFileName,FileMode.Create,FileAccess.Write))
-                    ms.WriteTo(fs);
-            }
-
-
-            Trace.WriteLine("Reading Vector array from file: " + fullFileName);
-
-            Vector3[] arrayFromFile;
-            using(MemoryStream ms = new MemoryStream())
-            using (FileStream fs = new FileStream(fullFileName, FileMode.Open, FileAccess.Read))
-            {
-                fs.CopyTo(ms);
-                arrayFromFile = new Vector3[ms.Length / 4];
-                var buffer = new byte[12];
-                
-                for (int vecIdx = 0; vecIdx < ms.Length / 4; ++vecIdx)
-                {
-                    ms.Read(buffer, vecIdx * 12, 12);
-                    var x = BitConverter.ToSingle(buffer, 0);
-                    var y = BitConverter.ToSingle(buffer, 4);
-                    var z = BitConverter.ToSingle(buffer, 8);
-                    arrayFromFile[vecIdx] = new Vector3(x, y, z);
-                }
-            }
+            var tMeshFromFile = TerraMap.TerraMesh.Deserialize(dataFromFile);
 
             Assert.True(true);
-
-
         }
         
         [Test]
