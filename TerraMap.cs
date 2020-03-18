@@ -1,8 +1,8 @@
 using System;
-
-namespace ioTerraMap
+using ioSS.Util.Maths.Geometry;
+namespace ioSS.TerraMapLib
 {
-    [Serializable]
+    
     public partial class TerraMap
     {
         public readonly Settings settings;

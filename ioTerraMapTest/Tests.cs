@@ -1,16 +1,19 @@
-﻿using System;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Threading;
-using ioDelaunay;
-using ioTerraMap;
+using ioSS.TerraMapLib;
+using ioSS.Util;
+using ioSS.Util.Maths.Geometry;
 using NUnit.Framework;
-using ioUtils;
 
 namespace ioTerraMapTest
 {
     [TestFixture]
     public class Tests
     {
+        public void Test2()
+        {
+        }
+
         [Test]
         public void Test1()
         {
@@ -27,30 +30,22 @@ namespace ioTerraMapTest
             };
 
 
-            bool isDone = false;
+            var isDone = false;
             TerraMap finishedMap = null;
             TerraMap.Generator.OnComplete onComplete = _tMap =>
             {
                 finishedMap = _tMap;
                 isDone = true;
             };
-            Thread genThread = new Thread(() => TerraMap.Generator.Generate(sets, onComplete, progOnUpdate));
+            var genThread = new Thread(() => TerraMap.Generator.Generate(sets, onComplete, progOnUpdate));
             genThread.Start();
 
-            while (isDone == false)
-            {
-                System.Threading.Thread.Sleep(100);
-            }
+            while (isDone == false) Thread.Sleep(100);
 
             var mapExists = finishedMap != null;
-            
-            
-            Assert.True(mapExists);
-        }
 
-        public void Test2()
-        {
-            
+
+            Assert.True(mapExists);
         }
     }
 }

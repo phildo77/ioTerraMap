@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using ioDelaunay;
+using ioSS.Util.Maths.Geometry;
 
-namespace ioTerraMap
+namespace ioSS.TerraMapLib
 {
     public partial class TerraMap
     {
@@ -29,6 +29,7 @@ namespace ioTerraMap
             private class SerializedBundle
             {
                 private const int CUR_VERSION = 1;
+
                 public readonly int[] HullSites;
                 public readonly int[][] SiteCorners;
                 public readonly int[][] SiteNeighbors;
@@ -44,12 +45,10 @@ namespace ioTerraMap
                 private ByteVector2 bytesVec2;
                 private ByteVector3 bytesVec3;
 
-                private readonly byte[] DataBuffer;
-
                 public SerializedBundle(TerraMesh _tm)
                 {
                     Version = CUR_VERSION;
-
+                    
                     //Vector2 -- 8 bytes
                     Vertices = _tm.Vertices;
                     //int - 4 bytes
@@ -70,7 +69,7 @@ namespace ioTerraMap
                         totalSetCount += _tm.SitesHavingCorner[cornerIdx].Count;
 
                     var dataLen = sizeof(int); //Total size header
-                    dataLen = sizeof(int); // Version
+                    dataLen += sizeof(int); // Version
                     dataLen += sizeof(int); // Vertex count header
                     dataLen += Vertices.Length * sizeof(float) * 2; // Vector2
                     dataLen += sizeof(int); // Triangle count header
@@ -87,22 +86,22 @@ namespace ioTerraMap
                     dataLen += SitesHavingCorner.Length * sizeof(int); //Site Having corner count headers
                     dataLen += totalSetCount * sizeof(int); //Sites having corner set indexes
 
-                    DataBuffer = new byte[dataLen];
+                    SerializedData = new byte[dataLen];
                     BufIdx = 0;
 
                     byte32 = new Byte32();
                     bytesVec2 = new ByteVector2();
                     bytesVec3 = new ByteVector3();
 
-                    byte32.Write(DataBuffer, ref BufIdx, dataLen);
-                    
-                    SerializeVertices(ref BufIdx, DataBuffer);
-                    SerializeTris(ref BufIdx, DataBuffer);
-                    SerializeHullSites(ref BufIdx, DataBuffer);
-                    SerializeSiteCorners(ref BufIdx, DataBuffer);
-                    SerializeSiteNeighbors(ref BufIdx, DataBuffer);
-                    SerializeSitePositions(ref BufIdx, DataBuffer);
-                    SerializeSitesHavingCorner(ref BufIdx, DataBuffer);
+                    byte32.Write(SerializedData, ref BufIdx, dataLen);
+                    byte32.Write(SerializedData, ref BufIdx, Version);
+                    SerializeVertices(ref BufIdx, SerializedData);
+                    SerializeTris(ref BufIdx, SerializedData);
+                    SerializeHullSites(ref BufIdx, SerializedData);
+                    SerializeSiteCorners(ref BufIdx, SerializedData);
+                    SerializeSiteNeighbors(ref BufIdx, SerializedData);
+                    SerializeSitePositions(ref BufIdx, SerializedData);
+                    SerializeSitesHavingCorner(ref BufIdx, SerializedData);
                 }
 
                 public SerializedBundle(byte[] _data)
@@ -110,43 +109,43 @@ namespace ioTerraMap
                     byte32 = new Byte32();
                     bytesVec2 = new ByteVector2();
                     bytesVec3 = new ByteVector3();
-                    DataBuffer = _data;
+                    SerializedData = _data;
                     BufIdx = 0;
 
-                    byte32.Read(DataBuffer, ref BufIdx);
-                    var totalLen = byte32.integer;
+                    
+                    var totalLen = byte32.ReadInt(SerializedData, ref BufIdx);
 
-                    var version = byte32.ReadInt(DataBuffer, ref BufIdx);
+                    var version = byte32.ReadInt(SerializedData, ref BufIdx);
 
-                    var vertexCount = byte32.ReadInt(DataBuffer, ref BufIdx);
+                    var vertexCount = byte32.ReadInt(SerializedData, ref BufIdx);
                     Vertices = DeserializeVectors(vertexCount);
 
-                    var triangleCount = byte32.ReadInt(DataBuffer, ref BufIdx);
+                    var triangleCount = byte32.ReadInt(SerializedData, ref BufIdx);
                     Triangles = DeserializeTris(triangleCount);
 
-                    var hullSitesCount = byte32.ReadInt(DataBuffer, ref BufIdx);
+                    var hullSitesCount = byte32.ReadInt(SerializedData, ref BufIdx);
                     HullSites = DeserializeHullSites(hullSitesCount);
 
-                    var siteCornerCount = byte32.ReadInt(DataBuffer, ref BufIdx);
+                    var siteCornerCount = byte32.ReadInt(SerializedData, ref BufIdx);
                     SiteCorners = DeserializeSiteCorners(siteCornerCount);
 
-                    var siteNeighborsCount = byte32.ReadInt(DataBuffer, ref BufIdx);
+                    var siteNeighborsCount = byte32.ReadInt(SerializedData, ref BufIdx);
                     SiteNeighbors = DeserializeSiteNeighbors(siteNeighborsCount);
 
-                    var sitePositionsCount = byte32.ReadInt(DataBuffer, ref BufIdx);
+                    var sitePositionsCount = byte32.ReadInt(SerializedData, ref BufIdx);
                     SitePositions = DeserializeSitePositions(sitePositionsCount);
 
-                    var sitesHavingCornerCount = byte32.ReadInt(DataBuffer, ref BufIdx);
+                    var sitesHavingCornerCount = byte32.ReadInt(SerializedData, ref BufIdx);
                     SitesHavingCorner = DeserializeSitesHavingCorner(sitesHavingCornerCount);
                 }
 
-                public byte[] SerializedData => DataBuffer;
+                public byte[] SerializedData { get; }
 
                 private Vector2[] DeserializeVectors(int _count)
                 {
                     var vertices = new Vector2[_count];
                     for (var vIdx = 0; vIdx < _count; ++vIdx)
-                        vertices[vIdx] = bytesVec2.Read(DataBuffer, ref BufIdx);
+                        vertices[vIdx] = bytesVec2.Read(SerializedData, ref BufIdx);
                     return vertices;
                 }
 
@@ -154,7 +153,7 @@ namespace ioTerraMap
                 {
                     var tris = new int[_count];
                     for (var tIdx = 0; tIdx < _count; ++tIdx)
-                        tris[tIdx] = byte32.ReadInt(DataBuffer, ref BufIdx);
+                        tris[tIdx] = byte32.ReadInt(SerializedData, ref BufIdx);
                     return tris;
                 }
 
@@ -162,7 +161,7 @@ namespace ioTerraMap
                 {
                     var hullSites = new int[_count];
                     for (var hsIdx = 0; hsIdx < _count; ++hsIdx)
-                        hullSites[hsIdx] = byte32.ReadInt(DataBuffer, ref BufIdx);
+                        hullSites[hsIdx] = byte32.ReadInt(SerializedData, ref BufIdx);
                     return hullSites;
                 }
 
@@ -172,9 +171,9 @@ namespace ioTerraMap
                     for (var scIdx = 0; scIdx < _count; ++scIdx)
                     {
                         siteCorners[scIdx] = new int[3];
-                        siteCorners[scIdx][0] = byte32.ReadInt(DataBuffer, ref BufIdx);
-                        siteCorners[scIdx][1] = byte32.ReadInt(DataBuffer, ref BufIdx);
-                        siteCorners[scIdx][2] = byte32.ReadInt(DataBuffer, ref BufIdx);
+                        siteCorners[scIdx][0] = byte32.ReadInt(SerializedData, ref BufIdx);
+                        siteCorners[scIdx][1] = byte32.ReadInt(SerializedData, ref BufIdx);
+                        siteCorners[scIdx][2] = byte32.ReadInt(SerializedData, ref BufIdx);
                     }
 
                     return siteCorners;
@@ -186,9 +185,9 @@ namespace ioTerraMap
                     for (var snIdx = 0; snIdx < _count; ++snIdx)
                     {
                         siteNeighbors[snIdx] = new int[3];
-                        siteNeighbors[snIdx][0] = byte32.ReadInt(DataBuffer, ref BufIdx);
-                        siteNeighbors[snIdx][1] = byte32.ReadInt(DataBuffer, ref BufIdx);
-                        siteNeighbors[snIdx][2] = byte32.ReadInt(DataBuffer, ref BufIdx);
+                        siteNeighbors[snIdx][0] = byte32.ReadInt(SerializedData, ref BufIdx);
+                        siteNeighbors[snIdx][1] = byte32.ReadInt(SerializedData, ref BufIdx);
+                        siteNeighbors[snIdx][2] = byte32.ReadInt(SerializedData, ref BufIdx);
                     }
 
                     return siteNeighbors;
@@ -198,7 +197,7 @@ namespace ioTerraMap
                 {
                     var sitePositions = new Vector3[_count];
                     for (var spIdx = 0; spIdx < _count; ++spIdx)
-                        sitePositions[spIdx] = bytesVec3.Read(DataBuffer, ref BufIdx);
+                        sitePositions[spIdx] = bytesVec3.Read(SerializedData, ref BufIdx);
                     return sitePositions;
                 }
 
@@ -207,10 +206,10 @@ namespace ioTerraMap
                     var sitesHavingCorner = new HashSet<int>[_count];
                     for (var shcIdx = 0; shcIdx < _count; ++shcIdx)
                     {
-                        var siteCount = byte32.ReadInt(DataBuffer, ref BufIdx);
+                        var siteCount = byte32.ReadInt(SerializedData, ref BufIdx);
                         sitesHavingCorner[shcIdx] = new HashSet<int>();
                         for (var setIdx = 0; setIdx < siteCount; ++setIdx)
-                            sitesHavingCorner[shcIdx].Add(byte32.ReadInt(DataBuffer, ref BufIdx));
+                            sitesHavingCorner[shcIdx].Add(byte32.ReadInt(SerializedData, ref BufIdx));
                     }
 
                     return sitesHavingCorner;

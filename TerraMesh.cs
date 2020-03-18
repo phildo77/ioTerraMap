@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using ioDelaunay;
-using ioUtils;
+using ioSS.Util;
+using ioSS.Util.Maths.Geometry;
 
-namespace ioTerraMap
+namespace ioSS.TerraMapLib
 {
     public partial class TerraMap
     {
@@ -13,11 +13,12 @@ namespace ioTerraMap
         {
             public const int SiteIdxNull = -1;
 
-            ///Site / Triangle vertices
-            public readonly Vector2[] Vertices;
-            
             //Mesh Triangle vertex by index clockwise
             public readonly int[] Triangles;
+
+            ///Site / Triangle vertices
+            public readonly Vector2[] Vertices;
+
             public int[] HullSites;
 
             private Bounds m_Bounds;
@@ -34,24 +35,6 @@ namespace ioTerraMap
             //Hashtable of sites sharing vertex
             public HashSet<int>[] SitesHavingCorner;
 
-            public Vector2[] UV 
-            {
-                get
-                {
-                    var uv = new Vector2[this.Vertices.Length];
-                    var relOS = new Vector2(m_Bounds.min.x, m_Bounds.min.y);
-                    for (int pIdx = 0; pIdx < Vertices.Length; ++pIdx)
-                    {
-                        var relPos = Vertices[pIdx] - relOS;
-                        var uvPos = new Vector2(relPos.x / m_Bounds.size.x, relPos.y / m_Bounds.size.y);
-                        uv[pIdx] = uvPos;
-                    }
-                    return uv;
-                }
-            }
-
-            
-
 
             private TerraMesh()
             {
@@ -63,7 +46,23 @@ namespace ioTerraMap
                 Triangles = _triangles;
             }
 
-            
+            public Vector2[] UV
+            {
+                get
+                {
+                    var uv = new Vector2[Vertices.Length];
+                    var relOS = new Vector2(m_Bounds.min.x, m_Bounds.min.y);
+                    for (var pIdx = 0; pIdx < Vertices.Length; ++pIdx)
+                    {
+                        var relPos = Vertices[pIdx] - relOS;
+                        var uvPos = new Vector2(relPos.x / m_Bounds.size.x, relPos.y / m_Bounds.size.y);
+                        uv[pIdx] = uvPos;
+                    }
+
+                    return uv;
+                }
+            }
+
 
             public Bounds Bounds => new Bounds(m_Bounds.center, m_Bounds.size);
 

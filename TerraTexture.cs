@@ -2,10 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using ioDelaunay;
-using ioUtils;
+using ioSS.Util;
+using ioSS.Util.Maths.Geometry;
 
-namespace ioTerraMap
+namespace ioSS.TerraMapLib
 {
     public partial class TerraMap
     {
@@ -17,11 +17,11 @@ namespace ioTerraMap
             public TerraMap Host;
             private Vector2 m_PixSize;
             private Vector2 m_PixStep;
+
+            [NonSerialized] private Progress m_Progress;
+
             private Vector2 m_ZeroOffset;
             public Color[] Pixels;
-
-            [NonSerialized]
-            private Progress m_Progress;
 
             public TerraTexture(TerraMap _host, Progress.OnUpdate _onUpdate = null)
             {

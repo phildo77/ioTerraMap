@@ -3,11 +3,11 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
-using ioTerraMap;
-using NUnit.Framework;
-using ioDelaunay;
-using ioUtils;
 using System.Threading;
+using ioSS.TerraMapLib;
+using ioSS.Util;
+using ioSS.Util.Maths.Geometry;
+using NUnit.Framework;
 
 namespace ioTerraMapTest
 {
@@ -45,11 +45,11 @@ namespace ioTerraMapTest
             Assert.True(true);
         }
 
-       [Test]
+        [Test]
         public void TestSerializationTerraMesh()
         {
             var fullFileName = FilePath + "\\TerraMesh" + FileName;
-            
+
             var resolution = 1f;
             var sets = new TerraMap.Settings();
             sets.Resolution = 1;
@@ -63,20 +63,17 @@ namespace ioTerraMapTest
             };
 
 
-            bool isDone = false;
+            var isDone = false;
             TerraMap finishedMap = null;
             TerraMap.Generator.OnComplete onComplete = _tMap =>
             {
                 finishedMap = _tMap;
                 isDone = true;
             };
-            Thread genThread = new Thread(() => TerraMap.Generator.Generate(sets, onComplete, progOnUpdate));
+            var genThread = new Thread(() => TerraMap.Generator.Generate(sets, onComplete, progOnUpdate));
             genThread.Start();
 
-            while (isDone == false)
-            {
-                System.Threading.Thread.Sleep(100);
-            }
+            while (isDone == false) Thread.Sleep(100);
 
             var mapExists = finishedMap != null;
 
@@ -91,11 +88,11 @@ namespace ioTerraMapTest
 
             Assert.True(true);
         }
-        
+
         [Test]
         public void TestSerializeVectorArray2()
         {
-            Vector3[] array = new Vector3[]
+            Vector3[] array =
             {
                 Vector3.up,
                 Vector3.right,
@@ -105,17 +102,16 @@ namespace ioTerraMapTest
                 Vector3.forward,
                 Vector3.zero
             };
-            byte[][] byteArray = new byte[array.Length][];
+            var byteArray = new byte[array.Length][];
 
 
-            
             var fullFileName = FilePath + "\\VectorArray" + FileName;
-            if (File.Exists(fullFileName)) 
+            if (File.Exists(fullFileName))
                 File.Delete(fullFileName);
             Trace.WriteLine("Writing Vector array to file: " + fullFileName);
-            using (BinaryWriter bw = new BinaryWriter(File.Open(fullFileName,FileMode.Create)))
+            using (var bw = new BinaryWriter(File.Open(fullFileName, FileMode.Create)))
             {
-                for (int vecIdx = 0; vecIdx < array.Length; ++vecIdx)
+                for (var vecIdx = 0; vecIdx < array.Length; ++vecIdx)
                 {
                     var curVec = array[vecIdx];
                     bw.Write(curVec.x);
@@ -128,7 +124,7 @@ namespace ioTerraMapTest
             Trace.WriteLine("Reading Vector array from file: " + fullFileName);
 
             var arrayFromFile = new List<Vector3>();
-            using (BinaryReader br = new BinaryReader(File.OpenRead(fullFileName)))
+            using (var br = new BinaryReader(File.OpenRead(fullFileName)))
             {
                 while (br.BaseStream.Position != br.BaseStream.Length)
                 {
@@ -140,8 +136,6 @@ namespace ioTerraMapTest
             }
 
             Assert.True(true);
-
-
         }
     }
 }
