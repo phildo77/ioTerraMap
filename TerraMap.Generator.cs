@@ -107,6 +107,7 @@ namespace ioSS.TerraMapLib
             }
 
 
+            //TODO - consider wind effect on rain?  ie less rain on downward slopes?
             public static void ApplyWaterFlux(TerraMap _tMap, Progress.OnUpdate _onUpdate)
             {
                 var pdSurface = TerraMesh.PlanchonDarboux(_tMap.TMesh, _tMap.settings.MinPDSlope, _onUpdate);

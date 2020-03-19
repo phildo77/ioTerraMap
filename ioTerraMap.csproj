@@ -43,10 +43,10 @@
     <Compile Include="Settings.cs" />
     <Compile Include="TerraMap.cs" />
     <Compile Include="TerraMap.Generator.cs" />
-    <Compile Include="TerraMap.TerraMesh.Generator.cs" />
-    <Compile Include="TerraMesh.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="TerraMesh.Serialization.cs" />
+    <Compile Include="TerraMesh\TerraMesh.cs" />
+    <Compile Include="TerraMesh\TerraMesh.Generator.cs" />
+    <Compile Include="TerraMesh\TerraMesh.Serialization.cs" />
     <Compile Include="TerraTexture.cs" />
   </ItemGroup>
   <ItemGroup>

@@ -11,10 +11,7 @@ namespace ioSS.TerraMapLib
     {
         public partial class TerraMesh
         {
-            private Vector2 ToVec2(Vector3 _vec)
-            {
-                return new Vector2(_vec.x, _vec.y);
-            }
+            
 
             public static void Slice(TerraMesh _tMesh, int _maxVertCount, out int[][] _triIdxs)
             {
@@ -109,7 +106,7 @@ namespace ioSS.TerraMapLib
 
             internal class Generator
             {
-                internal static void
+                public static void
                     Generate(Settings _settings, Progress.OnUpdate _actProg,
                         OnComplete _onComplete) //TODO rename to _onUpdate
                 {
@@ -231,6 +228,8 @@ namespace ioSS.TerraMapLib
                 internal delegate void OnComplete(TerraMesh _tMesh);
             }
 
+            
+            
             public static class Modify
             {
                 public static void Blob(TerraMesh _tMesh, float _strength, float _radius, Vector2 _loc)
@@ -238,7 +237,7 @@ namespace ioSS.TerraMapLib
                     for (var sIdx = 0; sIdx < _tMesh.SitePositions.Length; ++sIdx)
                     {
                         var sPos = _tMesh.SitePositions[sIdx];
-                        var vert2d = _tMesh.ToVec2(sPos);
+                        var vert2d = sPos.ToVec2();
                         var dist = (vert2d - _loc).magnitude;
                         if (dist > _radius) continue;
                         var cosVal = dist / _radius * (float) Math.PI / 2f;

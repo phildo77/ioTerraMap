@@ -4,7 +4,6 @@ namespace ioSS.TerraMapLib
 {
     public partial class TerraMap
     {
-        [Serializable]
         public class BiomeStuff
         {
             public Biome[][] BiomeConfig;

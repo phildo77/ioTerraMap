@@ -9,7 +9,6 @@ namespace ioSS.TerraMapLib
 {
     public partial class TerraMap
     {
-        [Serializable]
         public class TerraTexture
         {
             public readonly int Height;
@@ -438,11 +437,5 @@ namespace ioSS.TerraMapLib
         }
     }
 
-    internal static class Ext
-    {
-        internal static Vector2 ToVec2(this Vector3 _v)
-        {
-            return new Vector2(_v.x, _v.y);
-        }
-    }
+    
 }

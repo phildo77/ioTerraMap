@@ -19,6 +19,7 @@ namespace ioSS.TerraMapLib
             ///Site / Triangle vertices
             public readonly Vector2[] Vertices;
 
+            /// Sites with edges at the hull (outer most boundary)
             public int[] HullSites;
 
             private Bounds m_Bounds;
