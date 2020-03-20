@@ -1,8 +1,10 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using ioSS.Util;
+using ioSS.Util.Maths;
 using ioSS.Util.Maths.Geometry;
 
 namespace ioSS.TerraMapLib
@@ -94,7 +96,7 @@ namespace ioSS.TerraMapLib
                     var b = Host.TMesh.SitePositions[ww.NodeTo.SiteIdx].ToVec2();
                     var colWater = Host.TBiome.BiomeWater.ColTerrain;
                     var brush = new Brush(Brush.Shape.Circle, paintSize, colWater); //TODO Dynamic sizing
-                    PaintLineWld(a, b, brush);
+                    BrushLine(a, b, brush);
                 }
             }
 
@@ -131,44 +133,54 @@ namespace ioSS.TerraMapLib
                     var a = Host.TMesh.SitePositions[ww.SiteIdx].ToVec2();
                     var b = Host.TMesh.SitePositions[ww.NodeTo.SiteIdx].ToVec2();
                     var brush = new Brush(Brush.Shape.Circle, paintSize, new Color(0f, 0f, 1f)); //TODO Dynamic sizing
-                    PaintLineWld(a, b, brush);
+                    BrushLine(a, b, brush);
                 }
             }
 
-            private int[] GetPixelAtWld(Vector2 _pos)
+            private Pixel GetPixelAtWld(Vector2 _pos)
             {
                 var posOffset = _pos - m_ZeroOffset;
-                return new[] {(int) (posOffset.x / m_PixStep.x), (int) (posOffset.y / m_PixStep.y)};
+                //return new[] {(int) (posOffset.x / m_PixStep.x), (int) (posOffset.y / m_PixStep.y)};
+                return new Pixel((int) (posOffset.x / m_PixStep.x), (int) (posOffset.y / m_PixStep.y));
             }
 
             private void DrawLine(Vector2 _a, Vector2 _b, Color _col)
             {
-                var aCrd = GetPixelAtWld(_a);
-                var bCrd = GetPixelAtWld(_b);
+                var pixA = GetPixelAtWld(_a);
+                var pixB = GetPixelAtWld(_b);
 
-                DrawLine(aCrd[0], aCrd[1], bCrd[0], bCrd[1], _col);
+                DrawLine(pixA, pixB, _col);
             }
 
-            private void Paint(Brush _brush, int _x, int _y)
+            private void Paint(Pixel _p, Brush _brush)
             {
                 foreach (var coord in _brush.Footprint)
                 {
-                    var x = _x + (int) coord.x;
-                    var y = _y + (int) coord.y;
+                    var x = _p.x + (int) coord.x;
+                    var y = _p.y + (int) coord.y;
                     if (x < 0 || x >= Width) continue;
                     if (y < 0 || y >= Height) continue;
                     SetColorAtPix(x, y, _brush.Color);
                 }
             }
 
-            private void PaintLineWld(Vector2 _from, Vector2 _to, Brush _brush)
+            private void BrushLine(Vector2 _from, Vector2 _to, Brush _brush)
             {
                 var aCrd = GetPixelAtWld(_from);
                 var bCrd = GetPixelAtWld(_to);
-
-                PaintLinePix(aCrd[0], aCrd[1], bCrd[0], bCrd[1], _brush);
+                BrushLine(aCrd, bCrd, _brush);
             }
-
+            
+            private void BrushLine(Pixel _p1, Pixel _p2, Brush _brush)
+            {
+                var bh = new Bresenham(_p1, _p2);
+                do
+                {
+                    Paint(bh.Current, _brush);
+                } while (bh.MoveNext());
+            } 
+            
+            /* TODO remove
             private void PaintLinePix(int x, int y, int x2, int y2, Brush _brush)
             {
                 var w = x2 - x;
@@ -210,56 +222,152 @@ namespace ioSS.TerraMapLib
                 }
             }
 
-            private void DrawLine(int x, int y, int x2, int y2, Color color)
+            private void DrawLineOld(Pixel _p1, Pixel _p2, Color color)
             {
-                var w = x2 - x;
-                var h = y2 - y;
-                int dx1 = 0, dy1 = 0, dx2 = 0, dy2 = 0;
-                if (w < 0) dx1 = -1;
-                else if (w > 0) dx1 = 1;
-                if (h < 0) dy1 = -1;
-                else if (h > 0) dy1 = 1;
-                if (w < 0) dx2 = -1;
-                else if (w > 0) dx2 = 1;
-                var longest = Math.Abs(w);
-                var shortest = Math.Abs(h);
-                if (!(longest > shortest))
-                {
-                    longest = Math.Abs(h);
-                    shortest = Math.Abs(w);
-                    if (h < 0) dy2 = -1;
-                    else if (h > 0) dy2 = 1;
-                    dx2 = 0;
-                }
+                var bh = new Bresenham(_p1, _p2);
 
-                var numerator = longest >> 1;
-                for (var i = 0; i <= longest; i++)
+                var x = _p1.x;
+                var y = _p1.y;
+                var numerator = bh.Longest >> 1;
+                for (var i = 0; i <= bh.Longest; i++)
                 {
                     SetColorAtPix(x, y, color);
-                    numerator += shortest;
-                    if (!(numerator < longest))
+                    numerator += bh.Shortest;
+                    if (!(numerator < bh.Longest))
                     {
-                        numerator -= longest;
-                        x += dx1;
-                        y += dy1;
+                        numerator -= bh.Longest;
+                        x += bh.dx1;
+                        y += bh.dy1;
                     }
                     else
                     {
-                        x += dx2;
-                        y += dy2;
+                        x += bh.dx2;
+                        y += bh.dy2;
                     }
                 }
+            }
+            */
+
+            private void DrawLine(Pixel _p1, Pixel _p2, Color color)
+            {
+                var bh = new Bresenham(_p1, _p2);
+                do
+                {
+                    SetColorAtPix(bh.Current.x, bh.Current.y, color);
+                } while (bh.MoveNext());
+            } 
+            
+            public List<Pixel[]> GetPixTriangle(Vector2 _v1, Vector2 _v2, Vector2 _v3)
+            {
+                var vertices = new Vector2[] {_v1, _v2, _v3};
+                Vector2[] topTri, botTri;
+                Geom.SplitTriangle(vertices, out topTri, out botTri);
+
+                var p1 = GetPixelAtWld(topTri[0]);
+                var p2 = GetPixelAtWld(topTri[1]);
+                var p3 = GetPixelAtWld(topTri[2]);
+
+                var pixels = GetPixFlatTriangle(p1, p2, p3);
+
+                p1 = GetPixelAtWld(botTri[0]);
+                p2 = GetPixelAtWld(botTri[1]);
+                p3 = GetPixelAtWld(botTri[2]);
+
+                pixels.AddRange(GetPixFlatTriangle(p1, p2, p3));
+                return pixels;
+            }
+
+            private List<Pixel[]> GetPixFlatTriangle(Pixel _p1, Pixel _p2, Pixel _p3)
+            {
+                //Find Flat
+                Pixel[] flat;
+                Pixel tip;
+                if (_p1.y == _p2.y)
+                {
+                    flat = new[] {_p1, _p2};
+                    tip = _p3;
+                } else if (_p1.y == _p3.y)
+                {
+                    flat = new[] {_p1, _p3};
+                    tip = _p2;
+                } else if (_p2.y == _p3.y)
+                {
+                    flat = new[] {_p2, _p3};
+                    tip = _p1;
+                } else throw new Exception("FillFlatTriangle: No Flat Found"); //TODO debug
+
+                if (flat[0].x > flat[1].x)
+                {
+                    var swap = flat[0];
+                    flat[0] = flat[1];
+                    flat[1] = swap;
+                }
+
+                var pixList = new List<Pixel[]>();
+                var bh1 = new Bresenham(tip, flat[0]);
+                var bh2 = new Bresenham(tip, flat[1]);
+                var curY = bh1.Current.y;
+                do
+                {    //Find Next Y;
+                    do bh1.MoveNext(); while(bh1.Current.y == curY || bh1.End);
+                    do bh2.MoveNext(); while(bh2.Current.y == curY || bh2.End);
+                    var curLeft = bh1.Previous;
+                    var curRight = bh2.Previous;
+                    pixList.Add(GetPixHorizLine(curLeft.y, curLeft.x, curRight.x));
+                    
+                    curY = bh1.Current.y;
+                } while (!bh1.End);
+
+                return pixList;
+            }
+
+            private void DrawHorizLine(Pixel _p1, int _width, Color _color)
+            {
+                //TODO check for out of bounds
+                var startIdx = _p1.y * Width + _p1.x;
+                for (int idx = 0; idx < _width; ++idx)
+                    Pixels[startIdx + idx] = _color;
+            }
+
+            private Pixel[] GetPixHorizLine(int _y, int _x0, int _x1)
+            {
+                //Todo Check for out of bounds
+                var xMin = _x0;
+                var xMax = _x1;
+                if (_x0 > _x1)
+                {
+                    xMin = _x1;
+                    xMax = _x0;
+                }
+
+                var pixels = new Pixel[xMax - xMin + 1];
+
+                for (int idx = xMin; xMin <= xMax; ++idx)
+                    pixels[idx - xMin] = new Pixel(idx, _y);
+                return pixels;
+            }
+            private void DrawHorizLine(int _y, int _x0, int _x1, Color _color)
+            {
+                //Todo Check for out of bounds
+                var xMin = _x0;
+                var xMax = _x1;
+                if (_x0 > _x1)
+                {
+                    xMin = _x1;
+                    xMax = _x0;
+                }
+
+                for (int idx = _y * Width + xMin; idx < xMax - xMin; ++idx)
+                    Pixels[idx] = _color;
             }
 
             private void SetColorAtWld(Vector2 _pos, Color _col)
             {
                 var crd = GetPixelAtWld(_pos);
-                var x = crd[0];
-                var y = crd[1];
 
-                if (y * Width + x >= Pixels.Length) //TODO DEBUG
+                if (crd.y * Width + crd.x >= Pixels.Length) //TODO DEBUG
                     Trace.WriteLine("Debug");
-                Pixels[y * Width + x] = _col;
+                Pixels[crd.y * Width + crd.x] = _col;
             }
 
             private void SetColorAtPix(int _x, int _y, Color _col)
@@ -267,8 +375,88 @@ namespace ioSS.TerraMapLib
                 Pixels[_y * Width + _x] = _col;
             }
 
-            //TODO Messy (zspan & unefficient)
+            private void SetColorAtPix(Pixel _pixel, Color _col)
+            {
+                SetColorAtPix(_pixel.x, _pixel.y, _col);
+            }
+
+
             private void PaintTriangle(int _sIdx, Vector3[] _triVerts, float _zMin, float _zSpan, float _zWaterLvl)
+            {
+                var offset = new Vector3(m_ZeroOffset.x, m_ZeroOffset.y);
+
+                var triVertsOS = _triVerts.Select(_tri => _tri - offset).ToArray();
+
+                var xMin = triVertsOS.Min(_tri => _tri.x);
+                var xMax = triVertsOS.Max(_tri => _tri.x);
+                var yMin = triVertsOS.Min(_tri => _tri.y);
+                var yMax = triVertsOS.Max(_tri => _tri.y);
+
+                //Get starting surface sampling position
+                var xCntMin = (int) (xMin / m_PixStep.x);
+                var yCntMin = (int) (yMin / m_PixStep.y);
+                var xCntMax = (int) (xMax / m_PixStep.x);
+                var yCntMax = (int) (yMax / m_PixStep.y);
+
+                //Create Z calc function
+                var p1 = triVertsOS[0];
+                var p2 = triVertsOS[1];
+                var p3 = triVertsOS[2];
+
+                var v1x = p1.x - p3.x;
+                var v1y = p1.y - p3.y;
+                var v1z = p1.z - p3.z;
+
+                var v2x = p2.x - p3.x;
+                var v2y = p2.y - p3.y;
+                var v2z = p2.z - p3.z;
+
+                //Create cross product from the 2 vectors
+                var abcx = v1y * v2z - v1z * v2y;
+                var abcy = v1z * v2x - v1x * v2z;
+                var abcz = v1x * v2y - v1y * v2x;
+
+                var d = abcx * p3.x + abcy * p3.y + abcz * p3.z;
+
+                var zMax = _zMin + _zSpan;
+                //var wLvl = (zSpan + zMin) / 2f; //TODO Use settings landwaterratio
+
+                Func<Vector2, float> zOf = _p => (d - abcx * _p.x - abcy * _p.y) / abcz;
+
+                var v1 = triVertsOS[0].ToVec2();
+                var v2 = triVertsOS[1].ToVec2();
+                var v3 = triVertsOS[2].ToVec2();
+                var triPixels = GetPixTriangle(v1, v2, v3);
+                //Paint
+                
+                foreach(var pixelArr in triPixels)
+                foreach (var pixel in pixelArr)
+                {
+                    var pos = new Vector2(pixel.x * m_PixStep.x, pixel.y * m_PixStep.y);
+                    var z = zOf(pos);
+                    var pixIdx = pixel.y * Width + pixel.x;
+                    if (pixIdx >= Pixels.Length) //TODO Shouldn't happen?
+                        continue;
+                    if (z <= _zWaterLvl)
+                    {
+                        Pixels[pixIdx] = Host.TBiome.BiomeWater.ColTerrain;
+                    }
+                    else
+                    {
+                        var zNorm = (z - _zWaterLvl) / (zMax - _zWaterLvl);
+                        var mzIdx = Host.TBiome.SiteBiomeMoistZone[_sIdx];
+                        var col = Host.TBiome.GetBiomeColor(mzIdx, zNorm);
+                        Pixels[pixIdx] = col;
+                    }
+                }
+                
+                
+                
+            }
+            
+            
+            //TODO Messy (zspan & unefficient)
+            private void PaintTriangleOld(int _sIdx, Vector3[] _triVerts, float _zMin, float _zSpan, float _zWaterLvl)
             {
                 var offset = new Vector3(m_ZeroOffset.x, m_ZeroOffset.y);
 
@@ -327,7 +515,7 @@ namespace ioSS.TerraMapLib
                 for (var x = xCntMin; x <= xCntMax; ++x)
                 {
                     var pos = new Vector2(x * m_PixStep.x, y * m_PixStep.y);
-                    if (!PointInTriangle(pos, triVertsOS[0], triVertsOS[1], triVertsOS[2])) continue;
+                    if (!Geom.PointInTriangle(pos, triVertsOS[0], triVertsOS[1], triVertsOS[2])) continue;
                     var pixIdx = y * Width + x;
                     if (pixIdx >= Pixels.Length) //TODO Shouldn't happen?
                         continue;
@@ -352,28 +540,96 @@ namespace ioSS.TerraMapLib
                         Pixels[pixIdx] = col;
                     }
                 }
+                
             }
 
-            private static bool PointInTriangle(Vector2 p, Vector3 p0, Vector3 p1, Vector3 p2)
+            private class Bresenham : IEnumerator<Pixel>
             {
-                var s = p0.y * p2.x - p0.x * p2.y + (p2.y - p0.y) * p.x + (p0.x - p2.x) * p.y;
-                var t = p0.x * p1.y - p0.y * p1.x + (p0.y - p1.y) * p.x + (p1.x - p0.x) * p.y;
-
-                if (s < 0 != t < 0)
-                    return false;
-
-                var A = -p1.y * p2.x + p0.y * (p2.x - p1.x) + p0.x * (p1.y - p2.y) + p1.x * p2.y;
-                if (A < 0.0)
+                public int Longest, Shortest, dx1, dy1, dx2, dy2, Numerator;
+                private Pixel Cur, Prev;
+                public readonly Pixel P1, P2;
+                public int Iter => m_Iter;
+                private int m_Iter;
+                public bool End = false;
+                public Bresenham(Pixel _p1, Pixel _p2)
                 {
-                    s = -s;
-                    t = -t;
-                    A = -A;
+                    P1 = _p1;
+                    P2 = _p2;
+                    var w = P2.x - P1.x;
+                    var h = P2.y - P1.y;
+                    dx1 = dy1 = dx2 = dy2 = 0;
+                    if (w < 0) dx1 = -1;
+                    else if (w > 0) dx1 = 1;
+                    if (h < 0) dy1 = -1;
+                    else if (h > 0) dy1 = 1;
+                    if (w < 0) dx2 = -1;
+                    else if (w > 0) dx2 = 1;
+                    Longest = Math.Abs(w);
+                    Shortest = Math.Abs(h);
+                    if (!(Longest > Shortest))
+                    {
+                        Longest = Math.Abs(h);
+                        Shortest = Math.Abs(w);
+                        if (h < 0) dy2 = -1;
+                        else if (h > 0) dy2 = 1;
+                        dx2 = 0;
+                    }
+
+                    Reset();
                 }
 
-                return s > 0 && t > 0 && s + t <= A;
-            }
 
-            [Serializable]
+                public void Dispose() {}
+
+                public bool MoveNext()
+                {
+                    if (Iter > Longest)
+                    {
+                        End = true;
+                        return false;
+                    }
+                    Prev = Cur;
+                    Numerator += Shortest;
+                    if (!(Numerator < Longest))
+                    {
+                        Numerator -= Longest;
+                        Cur.x += dx1;
+                        Cur.y += dy1;
+                    }
+                    else
+                    {
+                        Cur.x += dx2;
+                        Cur.y += dy2;
+                    }
+                    m_Iter++;
+                    return true;
+                }
+
+                public void Reset()
+                {
+                    Prev = Pixel.Invalid;
+                    Cur = P1;
+                    m_Iter = 0;
+                    Numerator = Longest >> 1;
+                    End = false;
+                }
+
+                public Pixel Current => Cur;
+                public Pixel Previous => Prev;
+                object IEnumerator.Current => Current;
+            }
+            public struct Pixel
+            {
+                public static readonly Pixel Invalid = new Pixel(int.MaxValue, int.MaxValue);
+                public int x;
+                public int y;
+
+                public Pixel(int _x, int _y)
+                {
+                    x = _x;
+                    y = _y;
+                }
+            }
             public struct Color
             {
                 public float r;
