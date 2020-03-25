@@ -41,7 +41,10 @@ namespace ioSS.TerraMapLib
                     _gen.ApplyRandomLandFeatures(onUpdate, _onComplete);
                 }
 
-                TerraMesh.Generator.Generate(_gen.m_TerraMap.settings, onUpdate, TMeshOnComplete);
+                var terraMeshGen = TerraMesh.Generator.Stage(_gen.m_TerraMap.settings);
+                terraMeshGen.Generate(_onUpdate, TMeshOnComplete);
+
+                //TerraMesh.Generator.Generate(_gen.m_TerraMap.settings, onUpdate, TMeshOnComplete);
             }
 
             private void ApplyRandomLandFeatures(Progress.OnUpdate _onUpdate, OnComplete _onComplete)
@@ -63,7 +66,7 @@ namespace ioSS.TerraMapLib
                 m_Prog.Update(1, "Applying Global Slope", true);
 
                 m_Prog.Update(0, "Adding Hills / Blobs", true);
-                var meshBnd = tMesh.Bounds;
+                var meshBnd = tMesh.bounds;
                 var rectXY = new Rect(meshBnd.min.x, meshBnd.min.y, meshBnd.size.x, meshBnd.size.y);
                 for (var hIdx = 0; hIdx < settings.HillRndCnt.Count; ++hIdx)
                 {
@@ -110,10 +113,10 @@ namespace ioSS.TerraMapLib
             //TODO - consider wind effect on rain?  ie less rain on downward slopes?
             public static void ApplyWaterFlux(TerraMap _tMap, Progress.OnUpdate _onUpdate)
             {
-                var pdSurface = TerraMesh.PlanchonDarboux(_tMap.TMesh, _tMap.settings.MinPDSlope, _onUpdate);
+                var pdSurface = TerraMesh.Generator.PlanchonDarboux(_tMap.TMesh, _tMap.settings.MinPDSlope, _onUpdate);
 
                 //Calc water flux
-                var sitePos = _tMap.TMesh.SitePositions;
+                var sitePos = _tMap.TMesh.GetAllSitePositions();
                 _tMap.WaterFlux = new WaterNode[sitePos.Length];
 
                 //Init waterflux and heightmap - TODO sort not needed?
@@ -191,25 +194,30 @@ namespace ioSS.TerraMapLib
                 }
             }
 
-            ///Calculate sea level based on land water ratio
             public static void SetSeaLevelByLandRatio(TerraMap _tMap, float _landToWaterRatio)
+            {
+                var tMesh = _tMap.TMesh;
+                var sortedVertices = tMesh.Vertices.ToList();
+                sortedVertices.Sort((_a, _b) => _a.z.CompareTo(_b.z));
+
+                var vIdx = (int)(_landToWaterRatio * sortedVertices.Count);
+
+                _tMap.WaterSurfaceZ = sortedVertices[vIdx].z;
+
+            }
+            ///Calculate sea level based on land water ratio
+            public static void SetSeaLevelByLandRatio2(TerraMap _tMap, float _landToWaterRatio)
             {
                 var tMesh = _tMap.TMesh;
                 var landPctTgt = _landToWaterRatio;
                 if (landPctTgt <= 0 || landPctTgt >= 1)
                     landPctTgt = 0.5f;
 
-                var zMin = float.PositiveInfinity;
-                var zMax = float.NegativeInfinity;
+                var zMin = tMesh.bounds.min.z;
+                var zMax = tMesh.bounds.max.z;
 
-                //Find min max z TODO save from previous operation?
-                foreach (var site in tMesh.SitePositions)
-                {
-                    if (site.z < zMin)
-                        zMin = site.z;
-                    if (site.z > zMax)
-                        zMax = site.z;
-                }
+                var vertices = _tMap.TMesh.Vertices;
+                
 
                 //Start Find
                 var zCheck = zMin + (zMax - zMin) / 2f;
@@ -219,7 +227,7 @@ namespace ioSS.TerraMapLib
                 {
                     var aboveCnt = 0;
                     var belowCnt = 0;
-                    foreach (var site in tMesh.SitePositions)
+                    foreach (var site in vertices)
                         if (site.z > zCheck)
                             aboveCnt++;
                         else
@@ -252,7 +260,8 @@ namespace ioSS.TerraMapLib
                 var wwList = new List<WaterNode>(_tMap.WaterFlux);
 
                 //Prune ocean sites
-                wwList.RemoveAll(_wn => _tMap.TMesh.SitePositions[_wn.SiteIdx].z < _tMap.WaterSurfaceZ);
+                var sitePositions = _tMap.TMesh.GetAllSitePositions(); //TODO
+                wwList.RemoveAll(_wn => sitePositions[_wn.SiteIdx].z < _tMap.WaterSurfaceZ);
                 wwList.Sort((_a, _b) => _b.Flux.CompareTo(_a.Flux));
 
                 //Calc flux cutoff

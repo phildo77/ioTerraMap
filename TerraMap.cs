@@ -32,7 +32,7 @@ namespace ioSS.TerraMapLib
 
         public Vector3[] GetMeshVertsWaterTop()
         {
-            var verts = TMesh.ElevatedVerts();
+            var verts = TMesh.Vertices;
             for (var idx = 0; idx < verts.Length; ++idx)
                 if (verts[idx].z < WaterSurfaceZ)
                     verts[idx].Set(verts[idx].x, verts[idx].y, WaterSurfaceZ);

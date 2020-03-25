@@ -14,6 +14,7 @@ namespace ioSS.TerraMapLib
                 return sb.SerializedData;
             }
 
+            //TODO update for new terramesh
             public static TerraMesh Deserialize(byte[] _serializedData)
             {
                 var sb = new SerializedBundle(_serializedData);
@@ -21,7 +22,6 @@ namespace ioSS.TerraMapLib
                 tm.HullSites = sb.HullSites;
                 tm.SiteCorners = sb.SiteCorners;
                 tm.SiteNeighbors = sb.SiteNeighbors;
-                tm.SitePositions = sb.SitePositions;
                 tm.SitesHavingCorner = sb.SitesHavingCorner;
                 return tm;
             }
@@ -38,7 +38,7 @@ namespace ioSS.TerraMapLib
                 public readonly int[] Triangles;
 
                 public readonly int Version;
-                public readonly Vector2[] Vertices;
+                public readonly Vector3[] Vertices;
                 private int BufIdx;
 
                 private Byte32 byte32;
@@ -49,8 +49,8 @@ namespace ioSS.TerraMapLib
                 {
                     Version = CUR_VERSION;
                     
-                    //Vector2 -- 8 bytes
-                    Vertices = _tm.Vertices;
+                    //Vector3 -- 12 bytes
+                    Vertices = _tm.Vertices; //TODO Broken
                     //int - 4 bytes
                     Triangles = _tm.Triangles;
                     //int - 4 bytes
@@ -60,7 +60,7 @@ namespace ioSS.TerraMapLib
                     //3 ints - 12 bytes
                     SiteNeighbors = _tm.SiteNeighbors;
                     //Vector3 -- 12 bytes
-                    SitePositions = _tm.SitePositions;
+                    //SitePositions = _tm.SitePositions; //TODO BROKEN
                     //Variable -- need to track length for each set
                     SitesHavingCorner = _tm.SitesHavingCorner;
 
@@ -141,11 +141,11 @@ namespace ioSS.TerraMapLib
 
                 public byte[] SerializedData { get; }
 
-                private Vector2[] DeserializeVectors(int _count)
+                private Vector3[] DeserializeVectors(int _count)
                 {
-                    var vertices = new Vector2[_count];
+                    var vertices = new Vector3[_count];
                     for (var vIdx = 0; vIdx < _count; ++vIdx)
-                        vertices[vIdx] = bytesVec2.Read(SerializedData, ref BufIdx);
+                        vertices[vIdx] = bytesVec3.Read(SerializedData, ref BufIdx);
                     return vertices;
                 }
 
@@ -220,8 +220,8 @@ namespace ioSS.TerraMapLib
                     byte32.Write(_data, ref _index, Vertices.Length);
                     for (var vIdx = 0; vIdx < Vertices.Length; ++vIdx)
                     {
-                        bytesVec2.SetBytes(Vertices[vIdx]);
-                        bytesVec2.Write(_data, ref _index);
+                        bytesVec3.SetBytes(Vertices[vIdx]);
+                        bytesVec3.Write(_data, ref _index);
                     }
                 }
 

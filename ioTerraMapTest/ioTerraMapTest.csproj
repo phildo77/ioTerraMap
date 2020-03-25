@@ -46,6 +46,7 @@
     <Compile Include="Tests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="TestSerialization.cs" />
+    <Compile Include="TestTerraMesh.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\ioDelaunay\ioDelaunay.csproj">

@@ -1,4 +1,5 @@
 using System;
+using ioSS.Util.Drawing;
 
 namespace ioSS.TerraMapLib
 {
@@ -19,14 +20,14 @@ namespace ioSS.TerraMapLib
                 SetupBiomes();
 
                 //TODO Config Biomes on map using units of distance
-                var sitePos = Host.TMesh.SitePositions;
+                var sitePos = Host.TMesh.GetAllSitePositions();
                 SiteBiomeMoistZone = new int[sitePos.Length];
                 //SiteBiomeElevZone = new int[sitePos.Length];
                 //SiteBiomes = new Biome[sitePos.Length];
                 for (var sIdx = 0; sIdx < SiteBiomeMoistZone.Length; ++sIdx) SiteBiomeMoistZone[sIdx] = 5;
             }
 
-            public TerraTexture.Color GetBiomeColor(int _mzIdx, float _elevNorm)
+            public Color GetBiomeColor(int _mzIdx, float _elevNorm)
             {
                 var biomes = BiomeConfig[_mzIdx];
 
@@ -46,36 +47,36 @@ namespace ioSS.TerraMapLib
                 BiomeConfig = new Biome[6][];
 
                 //High elev (3)
-                var snow = new Biome {Name = "Snow", ColTerrain = new TerraTexture.Color(248, 248, 248)};
-                var tundra = new Biome {Name = "Tundra", ColTerrain = new TerraTexture.Color(221, 221, 187)};
-                var bare = new Biome {Name = "Bare", ColTerrain = new TerraTexture.Color(187, 187, 187)};
-                var scorched = new Biome {Name = "Scorched", ColTerrain = new TerraTexture.Color(153, 153, 153)};
+                var snow = new Biome {Name = "Snow", ColTerrain = new Color(248, 248, 248)};
+                var tundra = new Biome {Name = "Tundra", ColTerrain = new Color(221, 221, 187)};
+                var bare = new Biome {Name = "Bare", ColTerrain = new Color(187, 187, 187)};
+                var scorched = new Biome {Name = "Scorched", ColTerrain = new Color(153, 153, 153)};
 
                 //Upper Mid Elev(2)
-                var taiga = new Biome {Name = "Taiga", ColTerrain = new TerraTexture.Color(204, 212, 187)};
-                var shrubland = new Biome {Name = "Shrubland", ColTerrain = new TerraTexture.Color(196, 204, 187)};
+                var taiga = new Biome {Name = "Taiga", ColTerrain = new Color(204, 212, 187)};
+                var shrubland = new Biome {Name = "Shrubland", ColTerrain = new Color(196, 204, 187)};
                 var tempDesert = new Biome
-                    {Name = "Temperate Desert", ColTerrain = new TerraTexture.Color(228, 232, 202)};
+                    {Name = "Temperate Desert", ColTerrain = new Color(228, 232, 202)};
 
                 //Lower Mid Elev(1)
                 var tempRainFor = new Biome
-                    {Name = "Temperate Rain Forest", ColTerrain = new TerraTexture.Color(164, 196, 168)};
+                    {Name = "Temperate Rain Forest", ColTerrain = new Color(164, 196, 168)};
                 var tempDecidFor = new Biome
-                    {Name = "Temperate Deciduous Forest", ColTerrain = new TerraTexture.Color(180, 201, 169)};
-                var grassland = new Biome {Name = "Grassland", ColTerrain = new TerraTexture.Color(196, 212, 170)};
+                    {Name = "Temperate Deciduous Forest", ColTerrain = new Color(180, 201, 169)};
+                var grassland = new Biome {Name = "Grassland", ColTerrain = new Color(196, 212, 170)};
                 //var tempDesert = new Biome() { Name = "Temperate Desert", ColTerrain = new Color(228, 232, 202)};
 
                 //Low Elev (0)
                 var tropRainFor = new Biome
-                    {Name = "Temperate Rain Forest", ColTerrain = new TerraTexture.Color(156, 187, 169)};
+                    {Name = "Temperate Rain Forest", ColTerrain = new Color(156, 187, 169)};
                 var tropSeasFor = new Biome
-                    {Name = "Temperate Deciduous Forest", ColTerrain = new TerraTexture.Color(169, 204, 164)};
+                    {Name = "Temperate Deciduous Forest", ColTerrain = new Color(169, 204, 164)};
                 //var grassland = new Biome() { Name = "Grassland", ColTerrain = new Color(196, 212, 170)};
                 var subtropDes = new Biome
-                    {Name = "Temperate Desert", ColTerrain = new TerraTexture.Color(233, 221, 199)};
+                    {Name = "Temperate Desert", ColTerrain = new Color(233, 221, 199)};
 
                 //Water Elev
-                BiomeWater = new Biome {Name = "Water", ColTerrain = new TerraTexture.Color(54, 54, 97)};
+                BiomeWater = new Biome {Name = "Water", ColTerrain = new Color(54, 54, 97)};
 
                 BiomeConfig[0] = new Biome[4];
                 BiomeConfig[1] = new Biome[4];
@@ -107,7 +108,7 @@ namespace ioSS.TerraMapLib
             [Serializable]
             public class Biome
             {
-                public TerraTexture.Color ColTerrain;
+                public Color ColTerrain;
                 public string Name;
             }
         }
