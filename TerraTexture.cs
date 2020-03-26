@@ -14,8 +14,6 @@ namespace ioSS.TerraMapLib
     {
         public class TerraTexture
         {
-            public readonly int Height;
-            public readonly int Width;
             public TerraMap Host;
             private Vector2 m_PixSize;
 
@@ -23,26 +21,29 @@ namespace ioSS.TerraMapLib
 
             private Vector2 m_ZeroOffset;
             
+
+            
             //public Color[] Pixels;
             public Canvas canvas;
 
+            
             public TerraTexture(TerraMap _host, Progress.OnUpdate _onUpdate = null)
             {
+                Host = _host;
+                canvas = new Canvas((int)Math.Ceiling(Host.settings.TextureResolution * Host.settings.Bounds.width),
+                    (int)Math.Ceiling(Host.settings.TextureResolution * Host.settings.Bounds.height));
+                
                 m_Progress = new Progress("TerraTexture");
                 var actProg = _onUpdate ?? ((_progPct, _progStr) => { });
                 m_Progress.SetOnUpdate(actProg);
-
-                Host = _host;
+                
                 var mesh = Host.TMesh;
-                var bounds = Host.settings.Bounds;
 
-                Width = (int) (Host.settings.TextureResolution * bounds.width);
-                Height = (int) (Host.settings.TextureResolution * bounds.height);
                 var eVerts = mesh.Vertices;
-                m_PixSize = new Vector2(bounds.width / Width, bounds.height / Height);
-                m_ZeroOffset = new Vector2(Host.settings.Bounds.min.x, Host.settings.Bounds.min.y);
+                m_PixSize = new Vector2(Host.TMesh.bounds.size.x / canvas.Width, Host.TMesh.bounds.size.y / canvas.Height);
+                m_ZeroOffset = Host.TMesh.bounds.min.ToVec2();
 
-                Trace.WriteLine("Init Texture W: " + Width + " H: " + Height);
+                Trace.WriteLine("Init Texture W: " + canvas.Width + " H: " + canvas.Height);
                 var meshBounds = _host.TMesh.bounds;
                 float zMin = meshBounds.max.z;
                 float zMax = meshBounds.min.z;
@@ -137,18 +138,22 @@ namespace ioSS.TerraMapLib
                 }
             }
 
+            
+            
             private Canvas.Pixel GetPixelAtWld(Vector2 _pos)
             {
                 var posOffset = _pos - m_ZeroOffset;
                 //return new[] {(int) (posOffset.x / m_PixStep.x), (int) (posOffset.y / m_PixStep.y)};
-                return new Canvas.Pixel((int) (posOffset.x / m_PixSize.x), (int) (posOffset.y / m_PixSize.y));
+                var x = (int) (posOffset.x / m_PixSize.x);
+                var y = (int) (posOffset.y / m_PixSize.y);
+                return new Canvas.Pixel(x, (int) y);
             }
 
             private Vector2 GetWorldPositionOfPixel(Canvas.Pixel _pixel)
             {
-                var x = _pixel.x * m_PixSize.x - m_PixSize.x / 2f;
-                var y = _pixel.y * m_PixSize.y - m_PixSize.y / 2f;
-                return new Vector2(x, y);
+                var x = _pixel.x * m_PixSize.x + m_PixSize.x / 2f;
+                var y = _pixel.y * m_PixSize.y + m_PixSize.y / 2f;
+                return (new Vector2(x, y)) + m_ZeroOffset;
             }
 
             private void BrushLine(Vector2 _from, Vector2 _to, Canvas.Brush _brush)
@@ -214,6 +219,11 @@ namespace ioSS.TerraMapLib
                         var mzIdx = Host.TBiome.SiteBiomeMoistZone[_sIdx];
                         color = Host.TBiome.GetBiomeColor(mzIdx, zNorm);
                     }
+                    //TODO Debug
+                    //var zNormd = (z - _zMin) / _zSpan;
+                    //var db = 1 - zNormd;
+                    //var dg = zNormd;
+                    //color = new Color(0.2f, dg, db, 1);
                     canvas.Paint(pixel,color);
                 }
             }

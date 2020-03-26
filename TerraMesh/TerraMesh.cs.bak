@@ -41,62 +41,15 @@ namespace ioSS.TerraMapLib
 
             private TerraMesh(Vector2[] vertices, int[] _triangles)
             {
-                Vertices = new Vector3[vertices.Length];
-                float xMin = float.PositiveInfinity;
-                float xMax = float.NegativeInfinity;
-                float yMin = float.PositiveInfinity;
-                float yMax = float.NegativeInfinity;
-                for (int idx = 0; idx < vertices.Length; ++idx)
-                {
-                    var v2 = vertices[idx];
-                    if (v2.x < xMin) 
-                        xMin = v2.x;
-                    else if (v2.x > xMax)
-                        xMax = v2.x;
-                    if (v2.y < yMin)
-                        yMin = v2.y;
-                    else if (v2.y > yMax)
-                        yMax = v2.y;
-                    var v3 = new Vector3(v2.x, v2.y, 0);
-                    Vertices[idx] = v3;
-                }
+                Vertices = vertices.Select(_v => new Vector3(_v.x, _v.y, 0)).ToArray();
                 Triangles = _triangles;
-                var xSize = xMax - xMin;
-                var ySize = yMax - yMin;
-                var bndsCentX = xSize / 2 + xMin;
-                var bndsCentY = ySize / 2 + yMin;
-                m_Bounds = new Bounds(new Vector3(bndsCentX, bndsCentY, 0), new Vector3(xSize, ySize, 0));
-                
             }
 
-            private TerraMesh(Vector3[] _vertices, int[] _triangles) //TODO REMOVE? (serialization only)
+            private TerraMesh(Vector3[] _vertices, int[] _triangles)
             {
-                float xMin = float.PositiveInfinity;
-                float xMax = float.NegativeInfinity;
-                float yMin = float.PositiveInfinity;
-                float yMax = float.NegativeInfinity;
-                for (int idx = 0; idx < _vertices.Length; ++idx)
-                {
-                    var v2 = _vertices[idx];
-                    if (v2.x < xMin) 
-                        xMin = v2.x;
-                    else if (v2.x > xMax)
-                        xMax = v2.x;
-                    if (v2.y < yMin)
-                        yMin = v2.y;
-                    else if (v2.y > yMax)
-                        yMax = v2.y;
-                    var v3 = new Vector3(v2.x, v2.y, 0);
-                    Vertices[idx] = v3;
-                }
+                Vertices = _vertices;
                 Triangles = _triangles;
-                var xSize = xMax - xMin;
-                var ySize = yMax - yMin;
-                var bndsCentX = xSize / 2 + xMin;
-                var bndsCentY = ySize / 2 + yMin;
-                m_Bounds = new Bounds(new Vector3(bndsCentX, bndsCentY, 0), new Vector3(xSize, ySize, 0));
-
-            }    
+            }
 
             public Bounds bounds => new Bounds(m_Bounds.center, m_Bounds.size);
 

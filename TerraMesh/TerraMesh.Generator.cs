@@ -151,14 +151,10 @@ namespace ioSS.TerraMapLib
                     //Build TerraMesh Object
                     var mesh = Delaunay.Mesh;
                     TMesh = new TerraMesh(mesh.Vertices, mesh.Triangles);
-
+                    
                     IndexSites();
                     ComputeSiteData();
                     PopulateHullSites();
-                    
-                    var bndCent = new Vector3(Delaunay.BoundsRect.center.x, Delaunay.BoundsRect.center.y);
-                    var bndSize = new Vector3(Delaunay.BoundsRect.width, Delaunay.BoundsRect.height);
-                    TMesh.m_Bounds = new Bounds(bndCent, bndSize);
 
                     _onComplete(TMesh);
                 }
@@ -284,124 +280,7 @@ namespace ioSS.TerraMapLib
                     TMesh.HullSites = hullSites.ToArray();
                 }
                 
-                public static void
-                    Generate(Settings _settings, Progress.OnUpdate _actProg,
-                        OnComplete _onComplete) //TODO Delete
-                {
-                    var actProg = _actProg ?? ((_progPct, _progStr) => { });
-
-
-                    var prog = new Progress("TerraMesh");
-                    prog.SetOnUpdate(actProg);
-
-                    var bounds = _settings.Bounds;
-                    var xSize = bounds.width;
-                    var ySize = bounds.height;
-                    var xSpanCount = xSize * _settings.Resolution;
-                    var ySpanCount = ySize * _settings.Resolution;
-                    var pntCnt = (int) (xSpanCount * ySpanCount);
-
-
-                    prog.Update(0, "Generating Random Point Map");
-
-                    var points = new List<Vector2>(pntCnt);
-
-                    for (var pIdx = 0; pIdx < pntCnt; ++pIdx)
-                    {
-                        points.Add(Settings.RndVec2(bounds, _settings.m_Rnd));
-                        prog.Update((float) pIdx / pntCnt);
-                    }
-
-
-                    //TODO prune for dupes?
-                    var del = ioSS.Delaunay.Delaunay.Create<CircleSweep>(points);
-                    del.Prog.SetOnUpdate(actProg);
-                    del.Triangulate();
-                    var vor = new Voronoi(del);
-                    vor.Build();
-                    vor.TrimSitesToBndry(bounds);
-                    vor.LloydRelax(bounds);
-
-                    //Index Delaunay triangles
-                    prog.Update(0, "Indexing Tris");
-                    var triRef = new Dictionary<Delaunay.Delaunay.Triangle, int>();
-                    var tris = new List<Delaunay.Delaunay.Triangle>();
-                    var triScan = del.LastTri;
-
-                    var tsCnt = 0;
-                    var delTriangles = del.Mesh.Triangles;
-                    var debugTotTriCnt = delTriangles.Length;
-                    while (triScan != null)
-                    {
-                        tris.Add(triScan);
-                        triRef.Add(triScan, tsCnt++);
-                        triScan = triScan.PrevTri;
-                        prog.Update((float) tsCnt / debugTotTriCnt, tsCnt + " of " + debugTotTriCnt);
-                    }
-
-
-                    //Fill Neighbors
-                    triScan = del.LastTri;
-
-                    var tMesh = new TerraMesh(del.Mesh.Vertices, delTriangles);
-                    //tMesh.SitePositions = new Vector3[tsCnt];
-                    tMesh.SiteCorners = new int[tsCnt][];
-                    tMesh.SiteNeighbors = new int[tsCnt][];
-                    tMesh.SitesHavingCorner = new HashSet<int>[tMesh.Vertices.Length];
-                    prog.Update(0, "Filling Neighbors");
-                    while (triScan != null)
-                    {
-                        var tIdx = triRef[triScan];
-                        var triVertPoss = new[]
-                        {
-                            triScan.Edge0.OriginPos,
-                            triScan.Edge1.OriginPos,
-                            triScan.Edge2.OriginPos
-                        };
-                        var tCent = Geom.CentroidOfPoly(triVertPoss); //Use centroid instead of CircCent
-                        //tMesh.SitePositions[tIdx] = new Vector3(tCent.x, tCent.y, 0.5f);
-                        tMesh.SiteCorners[tIdx] = new int[3];
-                        tMesh.SiteNeighbors[tIdx] = new int[3];
-                        //Record neighbors
-                        var edges = new[] {triScan.Edge0, triScan.Edge1, triScan.Edge2};
-                        for (var eIdx = 0; eIdx < 3; ++eIdx)
-                        {
-                            var edge = edges[eIdx];
-                            var oIdx = edge.OriginIdx;
-                            if (tMesh.SitesHavingCorner[oIdx] == null)
-                                tMesh.SitesHavingCorner[oIdx] = new HashSet<int>();
-                            tMesh.SitesHavingCorner[oIdx].Add(tIdx);
-                            tMesh.SiteCorners[tIdx][eIdx] = oIdx;
-
-                            if (edge.Twin != null)
-                                tMesh.SiteNeighbors[tIdx][eIdx] = triRef[edge.Twin.Triangle];
-                            else
-                                tMesh.SiteNeighbors[tIdx][eIdx] = SiteIdxNull;
-                        }
-
-                        triScan = triScan.PrevTri;
-                        prog.Update((float) tsCnt / tMesh.Triangles.Length);
-                    }
-
-                    //Outer hull
-                    prog.Update(0, "Scanning Hull");
-                    var hullSites = new List<int>();
-                    for (var hIdx = 0; hIdx < del.HullEdges.Count; ++hIdx)
-                    {
-                        hullSites.Add(triRef[del.HullEdges[hIdx].Triangle]);
-                        prog.Update((float) hIdx / del.HullEdges.Count);
-                    }
-
-
-                    tMesh.HullSites = hullSites.ToArray();
-
-                    var bndCent = new Vector3(del.BoundsRect.center.x, del.BoundsRect.center.y);
-                    var bndSize = new Vector3(del.BoundsRect.width, del.BoundsRect.height);
-                    tMesh.m_Bounds = new Bounds(bndCent, bndSize);
-
-                    //Done
-                    _onComplete(tMesh);
-                }
+                
                 
                 public static Vector3[] PlanchonDarboux(TerraMesh _tMesh, float _minSlope, Progress.OnUpdate _onUpdate)
                 {
@@ -521,7 +400,7 @@ namespace ioSS.TerraMapLib
                 }
                 public static void Blob(TerraMesh _tMesh, float _strength, float _radius, Vector2 _loc)
                 {
-                    _tMesh.m_Bounds = new Bounds();
+                    //TODO bounds may not be correct
                     for (var sIdx = 0; sIdx < _tMesh.Vertices.Length; ++sIdx)
                     {
                         var sPos = _tMesh.Vertices[sIdx];
@@ -559,7 +438,7 @@ namespace ioSS.TerraMapLib
                     };
 
                     prog.Update(0, "Global Slope");
-                    _tMesh.m_Bounds = new Bounds();
+                    //TODO bounds may not be correct
                     for (var sIdx = 0; sIdx < _tMesh.Vertices.Length; ++sIdx)
                     {
                         //if (_tMesh.HullSites.Contains(sIdx))
@@ -586,7 +465,7 @@ namespace ioSS.TerraMapLib
                     var maxMag = (min - cent).magnitude;
 
                     prog.Update(0, "Conifying");
-                    _tMesh.m_Bounds = new Bounds();
+                    //TODO Bounds may not be correct
                     for (var sIdx = 0; sIdx < _tMesh.Vertices.Length; ++sIdx)
                     {
                         var sitePos = _tMesh.Vertices[sIdx];
@@ -629,7 +508,6 @@ namespace ioSS.TerraMapLib
                     }
 
                     //Apply erosion to terra mesh surface
-                    _tMesh.m_Bounds = new Bounds();
                     for (var pIdx = 0; pIdx < _waterFlux.Length; ++pIdx)
                     {
                         var sitePos = sitePositions[pIdx];
@@ -642,7 +520,7 @@ namespace ioSS.TerraMapLib
                     }
                     
                     //Reset Bounds TODO slow?
-                    _tMesh.m_Bounds = new Bounds();
+                    //TODO Bounds may not be correct
                     for (int vIdx = 0; vIdx < _tMesh.Vertices.Length; ++vIdx)
                         _tMesh.m_Bounds.Encapsulate(_tMesh.Vertices[vIdx]);
                 }
