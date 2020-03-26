@@ -36,19 +36,24 @@ namespace ioSS.TerraMapLib
                 m_Progress = new Progress("TerraTexture");
                 var actProg = _onUpdate ?? ((_progPct, _progStr) => { });
                 m_Progress.SetOnUpdate(actProg);
-                
-                var mesh = Host.TMesh;
-
-                var eVerts = mesh.Vertices;
                 m_PixSize = new Vector2(Host.TMesh.bounds.size.x / canvas.Width, Host.TMesh.bounds.size.y / canvas.Height);
                 m_ZeroOffset = Host.TMesh.bounds.min.ToVec2();
 
                 Trace.WriteLine("Init Texture W: " + canvas.Width + " H: " + canvas.Height);
-                var meshBounds = _host.TMesh.bounds;
+                
+                //Paint Waterways
+
+                //PaintRivers();
+            }
+
+            public void PaintTerrain() //TODO add biome paramter?
+            {
+                var meshBounds = Host.TMesh.bounds;
                 float zMin = meshBounds.max.z;
                 float zMax = meshBounds.min.z;
                 var zSpan = meshBounds.max.z - meshBounds.min.z;
-                var tris = mesh.Triangles;
+                var tris = Host.TMesh.Triangles;
+                var verts = Host.TMesh.Vertices;
 
                 for (var tvIdx = 0; tvIdx < tris.Length; tvIdx += 3)
                 {
@@ -57,17 +62,16 @@ namespace ioSS.TerraMapLib
                     //var mstZne = HostMap.SiteBiomeMoistZone[sIdx];
                     //var elvZne = HostMap.SiteBiomeElevZone[sIdx];
                     //var biome = HostMap.BiomeConfig[elvZne,mstZne];
-                    var verts = new[] {eVerts[tris[tvIdx]], eVerts[tris[tvIdx + 1]], eVerts[tris[tvIdx + 2]]};
+                    var triVerts = new[] {verts[tris[tvIdx]], verts[tris[tvIdx + 1]], verts[tris[tvIdx + 2]]};
 
-                    PaintTriangle(sIdx, verts, zMin, zSpan, _host.WaterSurfaceZ);
+                    PaintTriangle(sIdx, triVerts, zMin, zSpan, Host.WaterSurfaceZ);
                 }
 
-                //Paint Waterways
-
-                PaintRivers();
+                
             }
+            
 
-            private void PaintRivers()
+            public void PaintRivers()
             {
                 var fMin = float.PositiveInfinity;
                 var fMax = float.NegativeInfinity;
@@ -154,6 +158,26 @@ namespace ioSS.TerraMapLib
                 var x = _pixel.x * m_PixSize.x + m_PixSize.x / 2f;
                 var y = _pixel.y * m_PixSize.y + m_PixSize.y / 2f;
                 return (new Vector2(x, y)) + m_ZeroOffset;
+            }
+
+            public void PaintMeshLines(Color _color)
+            {
+                var tMesh = Host.TMesh;
+                for (int sIdx = 0; sIdx < tMesh.SiteCorners.Length; ++sIdx)
+                {
+                    var v1 = tMesh.Vertices[tMesh.SiteCorners[sIdx][0]].ToVec2();
+                    var v2 = tMesh.Vertices[tMesh.SiteCorners[sIdx][1]].ToVec2();
+                    var v3 = tMesh.Vertices[tMesh.SiteCorners[sIdx][2]].ToVec2();
+
+                    var p1 = GetPixelAtWld(v1);
+                    var p2 = GetPixelAtWld(v1);
+                    var p3 = GetPixelAtWld(v1);
+                    
+                    canvas.PaintLine(p1, p2, _color);
+                    canvas.PaintLine(p2, p3, _color);
+                    canvas.PaintLine(p3, p1, _color);
+
+                }
             }
 
             private void BrushLine(Vector2 _from, Vector2 _to, Canvas.Brush _brush)

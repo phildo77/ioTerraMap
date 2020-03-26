@@ -400,7 +400,6 @@ namespace ioSS.TerraMapLib
                 }
                 public static void Blob(TerraMesh _tMesh, float _strength, float _radius, Vector2 _loc)
                 {
-                    //TODO bounds may not be correct
                     for (var sIdx = 0; sIdx < _tMesh.Vertices.Length; ++sIdx)
                     {
                         var sPos = _tMesh.Vertices[sIdx];
@@ -411,9 +410,9 @@ namespace ioSS.TerraMapLib
                         var zShift = _strength * (float) Math.Cos(cosVal);
                         var newZ = sPos.z + zShift;
                         var newPos = new Vector3(vert2d.x, vert2d.y, sPos.z + zShift);
-                        _tMesh.m_Bounds.Encapsulate(newPos);
                         _tMesh.Vertices[sIdx] = newPos;
                     }
+                    _tMesh.RecalculateBounds();
                 }
                 
                 
@@ -438,7 +437,6 @@ namespace ioSS.TerraMapLib
                     };
 
                     prog.Update(0, "Global Slope");
-                    //TODO bounds may not be correct
                     for (var sIdx = 0; sIdx < _tMesh.Vertices.Length; ++sIdx)
                     {
                         //if (_tMesh.HullSites.Contains(sIdx))
@@ -448,9 +446,9 @@ namespace ioSS.TerraMapLib
                         var newZ = sitePos.z + zShift;
                         var newPos = new Vector3(sitePos.x, sitePos.y, newZ);
                         _tMesh.Vertices[sIdx] = newPos;
-                        _tMesh.m_Bounds.Encapsulate(newPos);
                         prog.Update((float) sIdx / _tMesh.Vertices.Length);
                     }
+                    _tMesh.RecalculateBounds();
                 }
 
                 public static void Conify(TerraMesh _tMesh, float _strength, Progress.OnUpdate _onUpdate = null)
@@ -465,7 +463,6 @@ namespace ioSS.TerraMapLib
                     var maxMag = (min - cent).magnitude;
 
                     prog.Update(0, "Conifying");
-                    //TODO Bounds may not be correct
                     for (var sIdx = 0; sIdx < _tMesh.Vertices.Length; ++sIdx)
                     {
                         var sitePos = _tMesh.Vertices[sIdx];
@@ -473,9 +470,9 @@ namespace ioSS.TerraMapLib
                         var zShift = magScal * _strength / 2f;
                         var newPos = new Vector3(sitePos.x, sitePos.y, zShift + sitePos.z);
                         _tMesh.Vertices[sIdx] = newPos;
-                        _tMesh.m_Bounds.Encapsulate(newPos);
                         prog.Update((float) sIdx / _tMesh.Vertices.Length);
                     }
+                    _tMesh.RecalculateBounds();
                 }
 
                 public static void Erode(TerraMesh _tMesh, float _maxErosionRate, float[] _waterFlux)
@@ -518,11 +515,7 @@ namespace ioSS.TerraMapLib
                         SetSiteHeight(_tMesh, pIdx, sitePos.z - erosionShift);
                         
                     }
-                    
-                    //Reset Bounds TODO slow?
-                    //TODO Bounds may not be correct
-                    for (int vIdx = 0; vIdx < _tMesh.Vertices.Length; ++vIdx)
-                        _tMesh.m_Bounds.Encapsulate(_tMesh.Vertices[vIdx]);
+                    _tMesh.RecalculateBounds();
                 }
 
                 public static void SetSiteHeight(TerraMesh _terraMesh, int _siteIdx, float _newZ)
@@ -534,10 +527,10 @@ namespace ioSS.TerraMapLib
                     foreach (var cornerIdx in cornerIndexes)
                     {
                         var curCornerPos = _terraMesh.Vertices[cornerIdx];
-                        _terraMesh.Vertices[cornerIdx] = 
-                            new Vector3(curCornerPos.x, curCornerPos.y, curCornerPos.z + heightDiff);
+                        var newCornerPos = new Vector3(curCornerPos.x, curCornerPos.y, curCornerPos.z + heightDiff);
+                        _terraMesh.Vertices[cornerIdx] = newCornerPos;
+                        _terraMesh.m_Bounds.Encapsulate(newCornerPos);
                     }
-                    
                 }
             }
         }

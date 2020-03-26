@@ -32,15 +32,17 @@ namespace ioSS.TerraMapLib
 
         public Vector3[] GetMeshVertsWaterTop()
         {
-            var verts = TMesh.Vertices;
+            var verts = new Vector3[TMesh.Vertices.Length];
             for (var idx = 0; idx < verts.Length; ++idx)
                 if (verts[idx].z < WaterSurfaceZ)
-                    verts[idx].Set(verts[idx].x, verts[idx].y, WaterSurfaceZ);
+                    verts[idx].Set(TMesh.Vertices[idx].x, TMesh.Vertices[idx].y, WaterSurfaceZ);
+                else
+                    verts[idx] = TMesh.Vertices[idx];
 
             return verts;
         }
 
-        [Serializable]
+        
         public class WaterNode
         {
             public float Flux;

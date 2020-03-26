@@ -96,7 +96,34 @@ namespace ioSS.TerraMapLib
                 var bndsCentY = ySize / 2 + yMin;
                 m_Bounds = new Bounds(new Vector3(bndsCentX, bndsCentY, 0), new Vector3(xSize, ySize, 0));
 
-            }    
+            }
+
+            private void RecalculateBounds()  //TODO is there smarter way to manage bounds?  Exclude x and y?
+            {
+                float xMin = float.PositiveInfinity;
+                float xMax = float.NegativeInfinity;
+                float yMin = float.PositiveInfinity;
+                float yMax = float.NegativeInfinity;
+                float zMin = float.PositiveInfinity;
+                float zMax = float.NegativeInfinity;
+                for (int idx = 0; idx < Vertices.Length; ++idx)
+                {
+                    var v = Vertices[idx];
+                    if (v.x < xMin)  xMin = v.x;
+                    else if (v.x > xMax) xMax = v.x;
+                    if (v.y < yMin) yMin = v.y;
+                    else if (v.y > yMax) yMax = v.y;
+                    if (v.z < zMin) zMin = v.z;
+                    else if (v.z > zMax) zMax = v.z;
+                }
+                var xSize = xMax - xMin;
+                var ySize = yMax - yMin;
+                var zSize = zMax - zMin;
+                var bndsCentX = xSize / 2 + xMin;
+                var bndsCentY = ySize / 2 + yMin;
+                var bndsCentZ = zSize / 2 + zMin;
+                m_Bounds = new Bounds(new Vector3(bndsCentX, bndsCentY, bndsCentZ), new Vector3(xSize, ySize, zSize));
+            }
 
             public Bounds bounds => new Bounds(m_Bounds.center, m_Bounds.size);
 
