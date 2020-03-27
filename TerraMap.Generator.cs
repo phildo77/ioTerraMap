@@ -18,10 +18,12 @@ namespace ioSS.TerraMapLib
 
             private Vector2 m_Size;
             private float m_PointDensity;
+            private Vector2[] Vertices;
 
-            public static Generator StageMapCreation(Settings _settings)
+            public static Generator StageMapCreation(Settings _settings, Vector2[] _meshVertices = null)
             {
                 var gen = new Generator();
+                gen.Vertices = _meshVertices;
                 gen.m_TerraMap = new TerraMap(_settings);
                 Trace.WriteLine("Generating new TerraMap with Seed " + _settings.Seed);
                 gen.m_Prog = new Progress("TerraMap");
@@ -30,7 +32,6 @@ namespace ioSS.TerraMapLib
             
             public void Generate(OnComplete _onComplete, Progress.OnUpdate _onUpdate)
             {
-                
                 GenerateTMesh(_onUpdate);
                 
                 //Temp TODO
@@ -59,8 +60,9 @@ namespace ioSS.TerraMapLib
                 var pointDensity = settings.Resolution;
                 var seed = settings.Seed;
 
-                var vertices = TerraMesh.Generator.GenerateRandomVertices(width, height, pointDensity, seed);
-                var terraMeshGen = TerraMesh.Generator.StageMeshGeneration(vertices);
+                if(Vertices == null)
+                    Vertices = TerraMesh.Generator.GenerateRandomVertices(width, height, pointDensity, seed);
+                var terraMeshGen = TerraMesh.Generator.StageMeshGeneration(Vertices);
                 terraMeshGen.Generate(_onUpdate, TMeshOnComplete);
 
                 //TerraMesh.Generator.Generate(_gen.m_TerraMap.settings, onUpdate, TMeshOnComplete);
