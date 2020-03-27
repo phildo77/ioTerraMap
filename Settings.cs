@@ -11,8 +11,6 @@ namespace ioSS.TerraMapLib
             CoastEuropean
         }
 
-
-        [Serializable]
         public class Settings
         {
             public static Settings Default = new Settings();
@@ -23,9 +21,11 @@ namespace ioSS.TerraMapLib
 
             private static Settings CoastEuropean = new Settings();
 
+            
             //Size and Bounds
             public Rect Bounds = new Rect(Vector2.one, Vector2.one * 500);
 
+            
             //Land Morphing
             public float ConifyStrength = 15f;
             public Vector2 GlobalSlopeDir = Vector2.zero;

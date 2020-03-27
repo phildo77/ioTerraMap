@@ -16,10 +16,10 @@ namespace ioSS.TerraMapLib
             private Progress m_Prog;
             private TerraMap m_TerraMap;
 
-            private Generator()
-            {
-            }
-
+            private Vector2 m_Size;
+            private float m_PointDensity;
+            
+            
             public static void Generate(Settings _settings, OnComplete _onComplete, Progress.OnUpdate _actProg)
             {
                 var gen = new Generator();
@@ -41,7 +41,14 @@ namespace ioSS.TerraMapLib
                     _gen.ApplyRandomLandFeatures(onUpdate, _onComplete);
                 }
 
-                var terraMeshGen = TerraMesh.Generator.Stage(_gen.m_TerraMap.settings);
+                var settings = _gen.m_TerraMap.settings;
+                var width = settings.Bounds.height;
+                var height = settings.Bounds.height;
+                var pointDensity = settings.Resolution;
+                var seed = settings.Seed;
+
+                var vertices = TerraMesh.Generator.GenerateRandomVertices(width, height, pointDensity, seed);
+                var terraMeshGen = TerraMesh.Generator.StageMeshGeneration(vertices);
                 terraMeshGen.Generate(_onUpdate, TMeshOnComplete);
 
                 //TerraMesh.Generator.Generate(_gen.m_TerraMap.settings, onUpdate, TMeshOnComplete);

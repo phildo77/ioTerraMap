@@ -7,6 +7,8 @@ namespace ioSS.TerraMapLib
     {
         public readonly Settings settings;
 
+        public readonly Vector2 Size;
+
         public int[] RiverSites;
         public BiomeStuff TBiome;
         public TerraMesh TMesh;
@@ -23,6 +25,11 @@ namespace ioSS.TerraMapLib
         private TerraMap(Settings _settings)
         {
             settings = _settings;
+        }
+
+        private TerraMap(float _width, float _height)
+        {
+            Size = new Vector2(_width, _height);
         }
 
         public float WaterFluxMin => settings.RainfallGlobal;

@@ -13,7 +13,12 @@ namespace ioTerraMapTest
         public void TestGenerate()
         {
             var sets = TerraMap.Settings.Default;
-            var generator = TerraMap.TerraMesh.Generator.Stage(sets);
+            var width = sets.Bounds.width;
+            var height = sets.Bounds.height;
+            var density = sets.Resolution;
+            var seed = sets.Seed;
+            var vertices = TerraMap.TerraMesh.Generator.GenerateRandomVertices(width, height, density, seed);
+            var generator = TerraMap.TerraMesh.Generator.StageMeshGeneration(vertices);
 
             TerraMap.TerraMesh tMesh;
             

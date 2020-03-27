@@ -107,10 +107,10 @@ namespace ioSS.TerraMapLib
 
             public class Generator
             {
-                private List<Vector2> Vertices;
+                private Vector2[] Vertices;
+                private Rect Bounds;
                 public Delaunay.Delaunay Delaunay;
                 public Delaunay.Voronoi Voronoi;
-                private Settings settings;
                 private Progress ProgressGenerator;
                 private TerraMesh TMesh;
                 
@@ -118,19 +118,29 @@ namespace ioSS.TerraMapLib
                 private Dictionary<Delaunay.Delaunay.Triangle, int> TriangleIndexReference;
                 private int TriangleCount;
                 
-                
                 public Progress.OnUpdate ProgOnUpdate;
 
-
-                public static Generator Stage(Settings _settings)
+                public static Generator StageMeshGeneration(Vector2[] _vertices)
                 {
-                    var generator = new Generator(_settings);
-                    return generator;
+                    return new Generator(_vertices);
                 }
 
-                private Generator(Settings _settings)
+                private Generator(Vector2[] _vertices)
                 {
-                    settings = _settings;
+                    Vertices = _vertices;
+                    float xMin = float.MaxValue, xMax = float.MinValue;
+                    float yMin = float.MaxValue, yMax = float.MinValue;
+                    Vector2[] genVertices = new Vector2[_vertices.Length];
+                    for (int vIdx = 0; vIdx < _vertices.Length; ++vIdx)
+                    {
+                        var v = genVertices[vIdx] = _vertices[vIdx];
+                        if (v.x < xMin) xMin = v.x;
+                        if (v.x > xMax) xMax = v.x;
+                        if (v.y < yMin) yMin = v.y;
+                        if (v.y > yMax) yMax = v.y;
+                    }
+                    Bounds = new Rect(xMin, yMin, xMax - xMin, yMax - yMin);
+                    
                     ProgressGenerator = new Progress("TerraMesh Generation");
                 }
 
@@ -138,9 +148,6 @@ namespace ioSS.TerraMapLib
                 {
                     ProgOnUpdate = _onUpdate;
                     ProgressGenerator.SetOnUpdate(_onUpdate);
-                    
-                    //Generate random points
-                    GenerateRandomPointMap();
                     
                     //Create and triangluate Delaunay
                     DoDelaunayTriangulation();
@@ -159,35 +166,32 @@ namespace ioSS.TerraMapLib
                     _onComplete(TMesh);
                 }
 
-                private void GenerateRandomPointMap()
+                public static Vector2[] GenerateRandomVertices(float _width, float _height, float _pointDensity, int _seed = int.MaxValue)
                 {
-                    
-                    
-                    var prog = new Progress("TerraMesh");
-                    prog.SetOnUpdate(ProgOnUpdate);
-
-                    var bounds = settings.Bounds;
+                    var bounds = new Rect(new Vector2(0,0), new Vector2(_width, _height));
                     var xSize = bounds.width;
                     var ySize = bounds.height;
-                    var xSpanCount = xSize * settings.Resolution;
-                    var ySpanCount = ySize * settings.Resolution;
+                    var xSpanCount = xSize * _pointDensity;
+                    var ySpanCount = ySize * _pointDensity;
                     var pntCnt = (int) (xSpanCount * ySpanCount);
+                    var random = new Random(_seed);
 
-
-                    prog.Update(0, "Generating Random Point Map");
-
-                    var points = new List<Vector2>(pntCnt);
-
-                    for (var pIdx = 0; pIdx < pntCnt; ++pIdx)
+                    Vector2 RndVec2()
                     {
-                        points.Add(Settings.RndVec2(bounds, settings.m_Rnd));
-                        prog.Update((float) pIdx / pntCnt);
+                        var x = (float) (random.NextDouble() * xSize);
+                        var y = (float) (random.NextDouble() * ySize);
+                        return new Vector2(x, y);
                     }
 
-                    Vertices = points;
+                    var points = new Vector2[pntCnt];
+
+                    for (var pIdx = 0; pIdx < pntCnt; ++pIdx)
+                        points[pIdx] = RndVec2();
+                    return points;
 
                 }
-
+                
+                
                 private void DoDelaunayTriangulation()
                 {
                     Delaunay = ioSS.Delaunay.Delaunay.Create<CircleSweep>(Vertices);
@@ -199,8 +203,8 @@ namespace ioSS.TerraMapLib
                 {
                     Voronoi = new Voronoi(Delaunay);
                     Voronoi.Build();
-                    Voronoi.TrimSitesToBndry(settings.Bounds);
-                    Voronoi.LloydRelax(settings.Bounds);
+                    Voronoi.TrimSitesToBndry(Bounds);
+                    Voronoi.LloydRelax(Bounds);
                 }
                 
                 private void IndexSites()
@@ -357,7 +361,6 @@ namespace ioSS.TerraMapLib
                 public delegate void OnComplete(TerraMesh _tMesh);
             }
 
-            
             
             public static class Modify
             {
