@@ -11,6 +11,7 @@ namespace ioSS.TerraMapLib
             CoastEuropean
         }
 
+        [Serializable]
         public class Settings
         {
             public static Settings Default = new Settings();

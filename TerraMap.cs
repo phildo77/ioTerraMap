@@ -41,7 +41,7 @@ namespace ioSS.TerraMapLib
         {
             var verts = new Vector3[TMesh.Vertices.Length];
             for (var idx = 0; idx < verts.Length; ++idx)
-                if (verts[idx].z < WaterSurfaceZ)
+                if (TMesh.Vertices[idx].z < WaterSurfaceZ)
                     verts[idx].Set(TMesh.Vertices[idx].x, TMesh.Vertices[idx].y, WaterSurfaceZ);
                 else
                     verts[idx] = TMesh.Vertices[idx];

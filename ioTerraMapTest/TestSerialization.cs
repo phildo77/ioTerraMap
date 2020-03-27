@@ -70,7 +70,8 @@ namespace ioTerraMapTest
                 finishedMap = _tMap;
                 isDone = true;
             };
-            var genThread = new Thread(() => TerraMap.Generator.Generate(sets, onComplete, progOnUpdate));
+            var gen = TerraMap.Generator.StageMapCreation(sets);
+            var genThread = new Thread(() => gen.Generate(onComplete, progOnUpdate));
             genThread.Start();
 
             while (isDone == false) Thread.Sleep(100);

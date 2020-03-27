@@ -18,30 +18,42 @@ namespace ioSS.TerraMapLib
 
             private Vector2 m_Size;
             private float m_PointDensity;
-            
-            
-            public static void Generate(Settings _settings, OnComplete _onComplete, Progress.OnUpdate _actProg)
+
+            public static Generator StageMapCreation(Settings _settings)
             {
                 var gen = new Generator();
                 gen.m_TerraMap = new TerraMap(_settings);
                 Trace.WriteLine("Generating new TerraMap with Seed " + _settings.Seed);
                 gen.m_Prog = new Progress("TerraMap");
-                GenerateTMesh(gen, _onComplete, _actProg);
+                return gen;
+            }
+            
+            public void Generate(OnComplete _onComplete, Progress.OnUpdate _onUpdate)
+            {
+                
+                GenerateTMesh(_onUpdate);
+                
+                //Temp TODO
+                m_Prog.Update(0, "Creating Map Texture", true);
+                m_TerraMap.TTex = new TerraTexture(m_TerraMap, _onUpdate);
+                m_Prog.Update(1, "Creating Map Texture", true);
+                m_Prog.Update(0, "Creating Biomes", true);
+                m_TerraMap.TBiome = new BiomeStuff(m_TerraMap);
+                m_Prog.Update(1, "Creating Biomes", true);
+                _onComplete(m_TerraMap);
             }
 
-            private static void GenerateTMesh(Generator _gen, OnComplete _onComplete,
-                Progress.OnUpdate _onUpdate = null)
+            private void GenerateTMesh(Progress.OnUpdate _onUpdate = null)
             {
                 var onUpdate = _onUpdate ?? ((_progPct, _progStr) => { });
-                _gen.m_Prog.SetOnUpdate(onUpdate);
+                m_Prog.SetOnUpdate(onUpdate);
 
                 void TMeshOnComplete(TerraMesh _tMesh)
                 {
-                    _gen.m_TerraMap.TMesh = _tMesh;
-                    _gen.ApplyRandomLandFeatures(onUpdate, _onComplete);
+                    m_TerraMap.TMesh = _tMesh;
                 }
 
-                var settings = _gen.m_TerraMap.settings;
+                var settings = m_TerraMap.settings;
                 var width = settings.Bounds.height;
                 var height = settings.Bounds.height;
                 var pointDensity = settings.Resolution;
@@ -54,66 +66,61 @@ namespace ioSS.TerraMapLib
                 //TerraMesh.Generator.Generate(_gen.m_TerraMap.settings, onUpdate, TMeshOnComplete);
             }
 
-            private void ApplyRandomLandFeatures(Progress.OnUpdate _onUpdate, OnComplete _onComplete)
+            //TODO split old settings add new settings for just this.
+            public static void ApplyRandomLandFeatures(TerraMap _tMap, Action _onComplete, Progress.OnUpdate _onUpdate)
             {
-                var tMesh = m_TerraMap.TMesh;
-                var settings = m_TerraMap.settings;
+                var prog = new Progress();
+                prog.SetOnUpdate(_onUpdate);
+                var tMesh = _tMap.TMesh;
+                var settings = _tMap.settings;
                 //Land morphing
 
-                m_Prog.Update(0, "Conifying", true);
+                prog.Update(0, "Conifying", true);
                 TerraMesh.Modify.Conify(tMesh, settings.ConifyStrength, _onUpdate);
-                m_Prog.Update(1, "Conifying", true);
+                prog.Update(1, "Conifying", true);
 
-                m_Prog.Update(0, "Applying Global Slope", true);
+                prog.Update(0, "Applying Global Slope", true);
                 var gSlpDir = settings.GlobalSlopeDir == Vector2.zero
                     ? new Vector2((float) (settings.m_Rnd.NextDouble() - 0.5f),
                         (float) (settings.m_Rnd.NextDouble() - 0.5f))
                     : settings.GlobalSlopeDir;
                 TerraMesh.Modify.SlopeGlobal(tMesh, gSlpDir, settings.GlobalSlopeMag);
-                m_Prog.Update(1, "Applying Global Slope", true);
+                prog.Update(1, "Applying Global Slope", true);
 
-                m_Prog.Update(0, "Adding Hills / Blobs", true);
+                prog.Update(0, "Adding Hills / Blobs", true);
                 var meshBnd = tMesh.bounds;
                 var rectXY = new Rect(meshBnd.min.x, meshBnd.min.y, meshBnd.size.x, meshBnd.size.y);
                 for (var hIdx = 0; hIdx < settings.HillRndCnt.Count; ++hIdx)
                 {
-                    m_Prog.Update((float) hIdx / settings.HillRndCnt.Count, "Adding hills / blobs");
+                    prog.Update((float) hIdx / settings.HillRndCnt.Count, "Adding hills / blobs");
                     for (var hCnt = 0; hCnt < settings.HillRndCnt[hIdx]; ++hCnt)
                         TerraMesh.Modify.Blob(tMesh, settings.HillRndStr[hIdx], settings.HillRndRad[hIdx],
                             Settings.RndVec2(rectXY, settings.m_Rnd));
                 }
 
-                m_Prog.Update(1, "Adding Hills / Blobs", true);
+                prog.Update(1, "Adding Hills / Blobs", true);
 
 
                 //Calculate water flux
-                m_Prog.Update(0, "Making Rivers", true);
-                ApplyWaterFlux(m_TerraMap, _onUpdate);
-                m_Prog.Update(1, "Making Rivers", true);
+                prog.Update(0, "Making Rivers", true);
+                ApplyWaterFlux(_tMap, _onUpdate);
+                prog.Update(1, "Making Rivers", true);
 
                 //Erosion
-                m_Prog.Update(0, "Eroding", true);
+                prog.Update(0, "Eroding", true);
                 TerraMesh.Modify.Erode(tMesh, settings.MaxErosionRate,
-                    m_TerraMap.WaterFlux.Select(_node => _node.Flux).ToArray());
-                m_Prog.Update(1, "Eroding", true);
+                    _tMap.WaterFlux.Select(_node => _node.Flux).ToArray());
+                prog.Update(1, "Eroding", true);
 
                 //Calculate Water Level
-                m_Prog.Update(0, "Setting Sea Level", true);
-                SetSeaLevelByLandRatio(m_TerraMap, settings.LandWaterRatio);
-                m_Prog.Update(1, "Setting Sea Level", true);
+                prog.Update(0, "Setting Sea Level", true);
+                SetSeaLevelByLandRatio(_tMap, settings.LandWaterRatio);
+                prog.Update(1, "Setting Sea Level", true);
 
-                m_Prog.Update(0, "Creating Biomes", true);
-                m_TerraMap.TBiome = new BiomeStuff(m_TerraMap);
-                m_Prog.Update(1, "Creating Biomes", true);
+                
 
-                PlaceRivers(m_TerraMap, settings.m_WaterwayThresh);
+                PlaceRivers(_tMap, settings.m_WaterwayThresh);
 
-                //Temp
-                m_Prog.Update(0, "Creating Map Texture", true);
-                m_TerraMap.TTex = new TerraTexture(m_TerraMap, _onUpdate);
-                m_Prog.Update(1, "Creating Map Texture", true);
-
-                _onComplete(m_TerraMap);
             }
 
 
